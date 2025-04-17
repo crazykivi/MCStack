@@ -1,0 +1,10 @@
+version: '3'
+services:
+  api:
+    build: .
+    ports:
+      - "3001:3001"
+      - "25565:25565"
+    volumes:
+      - ./server:/app/server
+    restart: always
