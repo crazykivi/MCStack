@@ -2,7 +2,7 @@ const express = require("express");
 const fs = require("fs-extra");
 const path = require("path");
 const {
-  // getVanillaServerUrl,
+  getVanillaServerUrl,
   downloadFile,
 } = require("./utils/downloadMinecraft");
 const { downloadAndExtractJava } = require("./utils/downloadJava");
