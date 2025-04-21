@@ -20,7 +20,16 @@ const { getRequiredJavaVersion } = require("./utils/versionUtils");
 const { authenticateRequest } = require("./middleware/serverAuth");
 const { spawn } = require("child_process");
 const config = require("./config/config.json");
-const { minecraftServer, commandOutup, commandError, commandSent, java, vanilla, forge, debug } = require("./utils/logger")
+const {
+  minecraftServer,
+  commandOutup,
+  commandError,
+  commandSent,
+  java,
+  vanilla,
+  forge,
+  debug,
+} = require("./utils/logger");
 
 const app = express();
 const PORT = 3001;
@@ -33,46 +42,12 @@ function getDefaultParams(query) {
 
 app.use(express.json());
 
-app.get("/start", authenticateRequest, async (req, res) => {
-  const { type, version } = getDefaultParams(req.query);
-  const core = req.query.core;
-
-  try {
-    const serverProcess = getServerProcess();
-    if (serverProcess && !serverProcess.killed) {
-      minecraftServer("Останавливаю предыдущий сервер...");
-      stopMinecraftServer();
-    }
-
-    const requiredJavaVersion = getRequiredJavaVersion(version);
-    java(`Требуемая версия Java: ${requiredJavaVersion}`);
-
-    const javaPath = await downloadAndExtractJava(requiredJavaVersion);
-
-    const serverDir = path.join(
-      __dirname,
-      config.serverDirectory,
-      `${type}-${version}`
-    );
-    await fs.ensureDir(serverDir);
-
-    await prepareServerEnvironment(serverDir, type, version, core, javaPath);
-
-    if (type === "vanilla") {
-      await startVanillaServer(serverDir, version, core, javaPath);
-    } else if (type === "mods" && core === "forge") {
-      await startForgeServer(serverDir, version, core, javaPath);
-    } else {
-      throw new Error(`Неизвестный тип сервера: ${type}`);
-    }
-
-    minecraftServer(`Сервер Minecraft ${type} версии ${version} успешно запущен.`);
-    res.send(`Сервер Minecraft ${type} версии ${version} успешно запущен.`);
-  } catch (error) {
-    console.error("Ошибка при запуске сервера:", error.message);
-    res.status(500).send(`Ошибка: ${error.message}`);
-  }
-});
+// Глобальный объект для хранения состояния сервера
+const serverState = {
+  type: null,
+  version: null,
+  core: null,
+};
 
 async function prepareServerEnvironment(
   serverDir,
@@ -94,7 +69,6 @@ async function prepareServerEnvironment(
   );
 }
 
-// Запуск Vanilla-сервера
 async function startVanillaServer(serverDir, version, core, javaPath) {
   const serverJarPath = path.join(serverDir, "server.jar");
   const serverUrl = await getServerUrl("vanilla", version, core);
@@ -106,7 +80,6 @@ async function startVanillaServer(serverDir, version, core, javaPath) {
   startMinecraftServer(command, serverDir);
 }
 
-// Запуск Forge-сервера
 async function startForgeServer(serverDir, version, core, javaPath) {
   const installerData = await getServerUrl("mods", version, core);
   const installerUrl = installerData.url;
@@ -180,15 +153,79 @@ async function getServerUrl(type, version, core) {
   }
 }
 
-// Маршрут для остановки сервера
+app.get("/start", authenticateRequest, async (req, res) => {
+  const { type, version } = getDefaultParams(req.query);
+  const core = req.query.core;
+
+  try {
+    const serverProcess = getServerProcess();
+    if (serverProcess && !serverProcess.killed) {
+      minecraftServer("Останавливаю предыдущий сервер...");
+      stopServer();
+    }
+
+    await startServer(type, version, core);
+
+    serverState.type = type;
+    serverState.version = version;
+    serverState.core = core;
+
+    res.send(`Сервер Minecraft ${type} версии ${version} успешно запущен.`);
+  } catch (error) {
+    console.error("Ошибка при запуске сервера:", error.message);
+    res.status(500).send(`Ошибка: ${error.message}`);
+  }
+});
+
+async function startServer(type, version, core = null) {
+  const requiredJavaVersion = getRequiredJavaVersion(version);
+  java(`Требуемая версия Java: ${requiredJavaVersion}`);
+
+  const javaPath = await downloadAndExtractJava(requiredJavaVersion);
+
+  const serverDir = path.join(
+    __dirname,
+    config.serverDirectory,
+    `${type}-${version}`
+  );
+  await fs.ensureDir(serverDir);
+
+  await prepareServerEnvironment(serverDir, type, version, core, javaPath);
+
+  let command;
+  if (type === "vanilla") {
+    command = await startVanillaServer(serverDir, version, core, javaPath);
+  } else if (type === "mods" && core === "forge") {
+    command = await startForgeServer(serverDir, version, core, javaPath);
+  } else {
+    throw new Error(`Неизвестный тип сервера: ${type}`);
+  }
+
+  minecraftServer(
+    `Сервер Minecraft ${type} версии ${version} успешно запущен.`
+  );
+  return command;
+}
+
 app.get("/stop", authenticateRequest, (req, res) => {
-  const stopped = stopMinecraftServer();
+  const stopped = stopServer();
   if (stopped) {
     res.send("Команда stop отправлена.");
   } else {
     res.status(400).send("[Minecraft Server]: Сервер не запущен.");
   }
 });
+
+function stopServer() {
+  const serverProcess = getServerProcess();
+  if (!serverProcess || serverProcess.killed) {
+    return false; // Сервер уже остановлен
+  }
+
+  minecraftServer("Отправлена команда stop на сервер...");
+  serverProcess.stdin.write("stop\n"); // Отправляем команду stop
+  return true; // Успешно отправлена команда
+}
 
 // Маршрут для сохранения мира
 app.get("/save", authenticateRequest, (req, res) => {
@@ -200,62 +237,33 @@ app.get("/save", authenticateRequest, (req, res) => {
   }
 });
 
-// Маршрут для перезапуска сервера
 app.get("/restart", authenticateRequest, async (req, res) => {
-  const { type, version } = req.query;
+  let { type, version, core } = req.query;
 
   if (!type || !version) {
-    return res.status(400).send("Необходимо указать параметры type и version.");
+    type = serverState.type;
+    version = serverState.version;
+    core = serverState.core;
+
+    if (!type || !version) {
+      return res
+        .status(400)
+        .send(
+          "Необходимо указать параметры type и version или предварительно запустить сервер."
+        );
+    }
   }
 
   try {
-    // Остановка сервера
-    const stopped = stopMinecraftServer();
+    const stopped = stopServer();
     if (!stopped) {
       return res.status(400).send("[Minecraft Server]: Сервер не запущен.");
     }
 
-    // Запуск сервера
-    const requiredJavaVersion = getRequiredJavaVersion(version);
-    java(`Требуемая версия Java: ${requiredJavaVersion}`);
-
-    const javaPath = await downloadAndExtractJava(requiredJavaVersion);
-
-    const serverUrl = await getServerUrl(type, version);
-    const serverDir = path.join(
-      __dirname,
-      config.serverDirectory,
-      `${type}-${version}`
-    );
-    await fs.ensureDir(serverDir);
-    const serverJarPath = path.join(serverDir, "server.jar");
-    await downloadFile(serverUrl, serverJarPath);
-
-    await acceptEULA(serverDir);
-
-    const memoryOptions = `-Xmx${config.maxMemory} -Xms${config.minMemory}`;
-    const command = `${javaPath} ${memoryOptions} -jar server.jar nogui`;
-    startMinecraftServer(command, serverDir);
-
+    await startServer(type, version, core);
     res.send(`Сервер Minecraft ${type} версии ${version} успешно перезапущен.`);
   } catch (error) {
     console.error("Ошибка при перезапуске сервера:", error.message);
-    res.status(500).send(`Ошибка: ${error.message}`);
-  }
-});
-
-app.post("/command", authenticateRequest, (req, res) => {
-  const { command } = req.body;
-
-  if (!command) {
-    return res.status(400).send("Необходимо указать параметр 'command'.");
-  }
-
-  try {
-    sendCommandToServer(command);
-    res.send(`Команда успешно отправлена: ${command}`);
-  } catch (error) {
-    console.error("Ошибка при отправке команды:", error.message);
     res.status(500).send(`Ошибка: ${error.message}`);
   }
 });
@@ -280,6 +288,22 @@ app.get("/status", authenticateRequest, async (req, res) => {
   } catch (error) {
     commandError("Error occurred:", error);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+app.post("/command", authenticateRequest, (req, res) => {
+  const { command } = req.body;
+
+  if (!command) {
+    return res.status(400).send("Необходимо указать параметр 'command'.");
+  }
+
+  try {
+    sendCommandToServer(command);
+    res.send(`Команда успешно отправлена: ${command}`);
+  } catch (error) {
+    console.error("Ошибка при отправке команды:", error.message);
+    res.status(500).send(`Ошибка: ${error.message}`);
   }
 });
 
