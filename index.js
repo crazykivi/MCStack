@@ -20,7 +20,7 @@ const { getRequiredJavaVersion } = require("./utils/versionUtils");
 const { authenticateRequest } = require("./middleware/serverAuth");
 const { spawn } = require("child_process");
 const config = require("./config/config.json");
-const { minecraftServer, commandOutup, commandError, commandSent, java, vanilla, forge } = require("./utils/logger")
+const { minecraftServer, commandOutup, commandError, commandSent, java, vanilla, forge, debug } = require("./utils/logger")
 
 const app = express();
 const PORT = 3001;
@@ -66,7 +66,7 @@ app.get("/start", authenticateRequest, async (req, res) => {
       throw new Error(`Неизвестный тип сервера: ${type}`);
     }
 
-    minecraftServer("Сервер Minecraft ${type} версии ${version} успешно запущен.");
+    minecraftServer(`Сервер Minecraft ${type} версии ${version} успешно запущен.`);
     res.send(`Сервер Minecraft ${type} версии ${version} успешно запущен.`);
   } catch (error) {
     console.error("Ошибка при запуске сервера:", error.message);
@@ -260,15 +260,27 @@ app.post("/command", authenticateRequest, (req, res) => {
   }
 });
 
-app.get("/status", authenticateRequest, (req, res) => {
-  const serverProcess = getServerProcess();
-  const isRunning = serverProcess && !serverProcess.killed;
+app.get("/status", authenticateRequest, async (req, res) => {
+  try {
+    const serverProcess = getServerProcess();
+    const isRunning = serverProcess && !serverProcess.killed;
 
-  res.json({
-    status: isRunning ? "running" : "stopped",
-    playersOnline: getPlayerCount(), // Реализуйте функцию для подсчета игроков
-    memoryUsage: getMemoryUsage(), // Реализуйте функцию для мониторинга RAM
-  }); // ДОБАВИТЬ ЛОГИРОВАНИЕ
+    const playersOnline = await getPlayerCount();
+    const memoryUsage = getMemoryUsage();
+
+    res.json({
+      status: isRunning ? "running" : "stopped",
+      playersOnline: playersOnline,
+      memoryUsage: memoryUsage,
+    });
+
+    debug(`Server status: ${isRunning ? "running" : "stopped"}`);
+    debug(`Players online: ${playersOnline}`);
+    debug(`Memory usage:`, memoryUsage);
+  } catch (error) {
+    commandError("Error occurred:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 function sendCommandToServer(command) {

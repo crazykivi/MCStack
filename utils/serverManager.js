@@ -83,10 +83,10 @@ function getMemoryUsage() {
 
   const memoryUsage = process.memoryUsage();
   return {
-    rss: formatBytes(memoryUsage.rss), // Resident Set Size
-    heapTotal: formatBytes(memoryUsage.heapTotal), // Общий размер кучи
-    heapUsed: formatBytes(memoryUsage.heapUsed), // Используемая куча
-    external: formatBytes(memoryUsage.external), // Память, используемая внешними библиотеками
+    rss: formatBytes(memoryUsage.rss), // Общий объём памяти
+    heapTotal: formatBytes(memoryUsage.heapTotal), // Общий размер кучи для JavaScript-объектов (NodeJS)
+    heapUsed: formatBytes(memoryUsage.heapUsed), // Фактическое использование в куче
+    external: formatBytes(memoryUsage.external), // Память, используемая внешними библиотеками (NodeJS)
   };
 }
 
@@ -104,7 +104,43 @@ function getServerProcess() {
 }
 
 function getPlayerCount() {
-  return currentPlayerCount;
+  return new Promise((resolve, reject) => {
+    const serverProcess = getServerProcess();
+
+    if (!serverProcess || serverProcess.killed) {
+      return resolve("0/0");
+    }
+
+    let resolved = false;
+
+    const handleOutput = (data) => {
+      const output = data.toString().trim();
+
+      const playerListMatch = output.match(/There are (\d+) of a max of (\d+) players online:/);
+      if (playerListMatch) {
+        const currentPlayers = parseInt(playerListMatch[1], 10);
+        const maxPlayers = parseInt(playerListMatch[2], 10);
+
+        if (!resolved) {
+          resolved = true;
+          serverProcess.stdout.off("data", handleOutput);
+          resolve(`${currentPlayers}/${maxPlayers}`);
+        }
+      }
+    };
+
+    serverProcess.stdout.on("data", handleOutput);
+
+    serverProcess.stdin.write("/list\n");
+
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        serverProcess.stdout.off("data", handleOutput);
+        resolve("0/0");
+      }
+    }, 5000);
+  });
 }
 
 module.exports = {
