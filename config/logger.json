@@ -1,7 +1,7 @@
 {
     "logging": {
       "enabled": true,
-      "debug": true,
+      "debug": false,
       "java": true,
       "commandOutup": true,
       "commandError": true,
