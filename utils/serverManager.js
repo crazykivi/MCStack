@@ -1,6 +1,7 @@
 const { spawn } = require("child_process");
 const fs = require("fs-extra");
 const path = require("path");
+const { minecraftServer } = require("./logger")
 
 let serverProcess = null; // Глобальная переменная для хранения процесса сервера
 let currentPlayerCount = 0; // Переменная для хранения количества игроков
@@ -8,7 +9,7 @@ let currentPlayerCount = 0; // Переменная для хранения ко
 async function acceptEULA(serverDir) {
   const eulaPath = path.join(serverDir, "eula.txt");
   await fs.writeFile(eulaPath, "eula=true", "utf8");
-  console.log(`[Minecraft Server]: EULA принято: ${eulaPath}`);
+  minecraftServer(`EULA принято: ${eulaPath}`);
 }
 
 function startMinecraftServer(command, workingDir) {
@@ -20,7 +21,7 @@ function startMinecraftServer(command, workingDir) {
 
   serverProcess.stdout.on("data", (data) => {
     const output = data.toString(); // Преобразуем данные в строку
-    console.log(`[Minecraft Server]: ${output}`);
+    minecraftServer(`${output}`);
 
     // Парсим вывод для подсчета игроков
     const playerCountMatch = output.match(
@@ -36,41 +37,41 @@ function startMinecraftServer(command, workingDir) {
   });
 
   serverProcess.on("close", (code) => {
-    console.log(`[Minecraft Server]: Процесс завершен с кодом ${code}`);
+    minecraftServer(`Процесс завершен с кодом ${code}`);
     serverProcess = null;
-    currentPlayerCount = 0; // Сбрасываем счетчик при остановке сервера
+    currentPlayerCount = 0;
   });
 }
 
 function stopMinecraftServer() {
   if (!serverProcess) {
-    console.log("[Minecraft Server]: Сервер не запущен.");
+    minecraftServer("Сервер не запущен.");
     return false;
   }
 
-  console.log("[Minecraft Server]: Отправка команды stop...");
+  minecraftServer("Отправка команды stop...");
   serverProcess.stdin.write("stop\n");
   return true;
 }
 
 function saveMinecraftServer() {
   if (!serverProcess) {
-    console.log("[Minecraft Server]: Сервер не запущен.");
+    minecraftServer("Сервер не запущен.");
     return false;
   }
 
-  console.log("[Minecraft Server]: Отправка команды save-all...");
+  minecraftServer("Отправка команды save-all...");
   serverProcess.stdin.write("save-all\n");
   return true;
 }
 
 function saveMinecraftServer() {
   if (!serverProcess) {
-    console.log("[Minecraft Server]: Сервер не запущен.");
+    minecraftServer("Сервер не запущен.");
     return false;
   }
 
-  console.log("[Minecraft Server]: Отправка команды save-all...");
+  minecraftServer("Отправка команды save-all...");
   serverProcess.stdin.write("save-all\n");
   return true;
 }
@@ -98,7 +99,6 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-// Функция для получения текущего процесса сервера
 function getServerProcess() {
   return serverProcess;
 }

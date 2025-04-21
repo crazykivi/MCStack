@@ -20,6 +20,7 @@ const { getRequiredJavaVersion } = require("./utils/versionUtils");
 const { authenticateRequest } = require("./middleware/serverAuth");
 const { spawn } = require("child_process");
 const config = require("./config/config.json");
+const { minecraftServer, commandOutup, commandError, commandSent, java, vanilla, forge } = require("./utils/logger")
 
 const app = express();
 const PORT = 3001;
@@ -39,12 +40,12 @@ app.get("/start", authenticateRequest, async (req, res) => {
   try {
     const serverProcess = getServerProcess();
     if (serverProcess && !serverProcess.killed) {
-      console.log("[Minecraft Server]: Останавливаю предыдущий сервер...");
+      minecraftServer("Останавливаю предыдущий сервер...");
       stopMinecraftServer();
     }
 
     const requiredJavaVersion = getRequiredJavaVersion(version);
-    console.log(`Требуемая версия Java: ${requiredJavaVersion}`);
+    java(`Требуемая версия Java: ${requiredJavaVersion}`);
 
     const javaPath = await downloadAndExtractJava(requiredJavaVersion);
 
@@ -65,6 +66,7 @@ app.get("/start", authenticateRequest, async (req, res) => {
       throw new Error(`Неизвестный тип сервера: ${type}`);
     }
 
+    minecraftServer("Сервер Minecraft ${type} версии ${version} успешно запущен.");
     res.send(`Сервер Minecraft ${type} версии ${version} успешно запущен.`);
   } catch (error) {
     console.error("Ошибка при запуске сервера:", error.message);
@@ -97,7 +99,7 @@ async function startVanillaServer(serverDir, version, core, javaPath) {
   const serverJarPath = path.join(serverDir, "server.jar");
   const serverUrl = await getServerUrl("vanilla", version, core);
   await downloadFile(serverUrl, serverJarPath);
-  console.log("[Vanilla]: Сервер скачан:", serverJarPath);
+  vanilla("Сервер скачан:", serverJarPath);
 
   const memoryOptions = `-Xmx${config.maxMemory} -Xms${config.minMemory}`;
   const command = `${javaPath} ${memoryOptions} -jar server.jar nogui`;
@@ -111,7 +113,7 @@ async function startForgeServer(serverDir, version, core, javaPath) {
   const installerJarPath = path.join(serverDir, "forge-installer.jar");
   await downloadFile(installerUrl, installerJarPath);
 
-  console.log("[Forge]: Установка Forge в headless режиме...");
+  forge("Установка Forge в headless режиме...");
   const installCommand = `${javaPath} -Djava.awt.headless=true -jar forge-installer.jar --installServer`;
   await executeCommand(installCommand, serverDir);
 
@@ -142,11 +144,11 @@ async function executeCommand(command, cwd) {
     const process = spawn(executable, args, { cwd });
 
     process.stdout.on("data", (data) => {
-      console.log(`[Command Output]: ${data.toString().trim()}`);
+      commandOutup(`[Command Output]: ${data.toString().trim()}`);
     });
 
     process.stderr.on("data", (data) => {
-      console.error(`[Command Error]: ${data.toString().trim()}`);
+      commandError(`[Command Error]: ${data.toString().trim()}`);
     });
 
     process.on("close", (code) => {
@@ -182,7 +184,7 @@ async function getServerUrl(type, version, core) {
 app.get("/stop", authenticateRequest, (req, res) => {
   const stopped = stopMinecraftServer();
   if (stopped) {
-    res.send("[Minecraft Server]: Команда stop отправлена.");
+    res.send("Команда stop отправлена.");
   } else {
     res.status(400).send("[Minecraft Server]: Сервер не запущен.");
   }
@@ -192,7 +194,7 @@ app.get("/stop", authenticateRequest, (req, res) => {
 app.get("/save", authenticateRequest, (req, res) => {
   const saved = saveMinecraftServer();
   if (saved) {
-    res.send("[Minecraft Server]: Команда save-all отправлена.");
+    res.send("Команда save-all отправлена.");
   } else {
     res.status(400).send("[Minecraft Server]: Сервер не запущен.");
   }
@@ -215,7 +217,7 @@ app.get("/restart", authenticateRequest, async (req, res) => {
 
     // Запуск сервера
     const requiredJavaVersion = getRequiredJavaVersion(version);
-    console.log(`Требуемая версия Java: ${requiredJavaVersion}`);
+    java(`Требуемая версия Java: ${requiredJavaVersion}`);
 
     const javaPath = await downloadAndExtractJava(requiredJavaVersion);
 
@@ -277,7 +279,7 @@ function sendCommandToServer(command) {
   }
 
   minecraftServerProcess.stdin.write(`${command}\n`);
-  console.log(`[Command Sent]: ${command}`);
+  commandSent(`[Command Sent]: ${command}`);
 }
 
 app.listen(PORT, () => {

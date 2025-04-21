@@ -1,11 +1,12 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
+const { debug, error } = require("../logger")
 
 async function getForgeVersion(minecraftVersion) {
   const forgeUrl = `https://files.minecraftforge.net/net/minecraftforge/forge/index_${minecraftVersion}.html`;
 
-  console.log(
-    `[Debug]: Запрос к Forge для версии ${minecraftVersion}: ${forgeUrl}`
+  debug(
+    `Запрос к Forge для версии ${minecraftVersion}: ${forgeUrl}`
   );
 
   try {
@@ -30,11 +31,11 @@ async function getForgeVersion(minecraftVersion) {
     }
 
     const forgeVersion = forgeVersionMatch[2];
-    console.log(`[Debug]: Найдена версия Forge: ${forgeVersion}`);
+    debug(`Найдена версия Forge: ${forgeVersion}`);
     return { url: realLink, version: forgeVersion };
   } catch (error) {
-    console.error(
-      `[Error]: Ошибка при получении данных о версии Forge: ${error.message}`
+    error(
+      `Ошибка при получении данных о версии Forge: ${error.message}`
     );
     throw new Error(
       `Не удалось получить данные о версии Forge для Minecraft ${minecraftVersion}.`

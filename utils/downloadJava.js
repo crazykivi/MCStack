@@ -3,6 +3,7 @@ const fs = require("fs-extra");
 const path = require("path");
 const tar = require("tar");
 const os = require("os");
+const { java } = require("./logger")
 
 async function cleanupOldJava() {
   const tempDir = os.tmpdir();
@@ -13,9 +14,9 @@ async function cleanupOldJava() {
   for (const dir of javaDirs) {
     try {
       await fs.remove(dir);
-      console.log(`[Cleanup]: Удалена старая версия Java: ${dir}`);
+      java(`Удалена старая версия Java: ${dir}`);
     } catch (error) {
-      console.error(`[Cleanup]: Не удалось удалить ${dir}: ${error.message}`);
+      java(`Не удалось удалить ${dir}: ${error.message}`);
     }
   }
 }
@@ -27,11 +28,11 @@ async function downloadAndExtractJava(version) {
 
   // Проверка существующей версии Java, если она совпадает с нужной, то скип удаления и скачивания
   if (await fs.pathExists(javaPath)) {
-    console.log(`[Java]: Версия ${version} уже скачана: ${tempDir}`);
+    java(`Версия ${version} уже скачана: ${tempDir}`);
     return javaPath;
   }
 
-  console.log(`[Java]: Скачивание версии ${version}...`);
+  java(`Скачивание версии ${version}...`);
   await cleanupOldJava(version);
 
   await fs.ensureDir(tempDir);
@@ -58,7 +59,7 @@ async function downloadAndExtractJava(version) {
 
   await fs.remove(archivePath);
 
-  console.log(`Java ${version} скачана и распакована в ${tempDir}`);
+  java(`Java ${version} скачана и распакована в ${tempDir}`);
   return javaPath;
 }
 

@@ -1,0 +1,14 @@
+{
+    "logging": {
+      "enabled": true,
+      "debug": true,
+      "java": true,
+      "commandOutup": true,
+      "commandError": true,
+      "commandSent": true,
+      "minecraftServer": true,
+      "vanilla": true,
+      "forge": true,
+      "fabric": true
+    }
+  }

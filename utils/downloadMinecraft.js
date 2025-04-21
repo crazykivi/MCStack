@@ -2,6 +2,7 @@ const axios = require("axios");
 const fs = require("fs-extra");
 
 const { getForgeVersion } = require("./forge/getForgeVersion.js");
+const { debug, forge, fabric } = require("./logger")
 
 async function downloadFile(url, destination) {
   if (!isValidUrl(url)) {
@@ -49,18 +50,18 @@ async function getVanillaServerUrl(version) {
 }
 
 async function getModsServerUrl(version, core) {
-  console.log(
-    `[Debug]: Вызов getModsServerUrl с параметрами: version=${version}, core=${core}`
+  debug(
+    `Вызов getModsServerUrl с параметрами: version=${version}, core=${core}`
   );
   switch (core) {
     case "forge":
       const forgeData = await getForgeVersion(version);
       const forgeUrl = forgeData.url;
-      console.log(`[Forge]: Формируемый URL: ${forgeUrl}`);
+      forge(`Формируемый URL: ${forgeUrl}`);
       return forgeData;
 
     case "fabric":
-      console.log("Скачивание ядра fabric пока не доступно");
+      fabric("Скачивание ядра fabric пока не доступно");
       throw new Error(`Неизвестное ядро: ${core}`);
   }
 }
