@@ -106,7 +106,7 @@ async function startForgeServer(serverDir, version, core, javaPath) {
   ${javaPath} @user_jvm_args.txt @libraries/net/minecraftforge/forge/${version}-${installerData.version}/unix_args.txt "$@"`.trim();
   await fs.writeFile(runScript, updatedRunScriptContent, { mode: 0o755 }); // Файл делается исполняемым
 
-  // Запускаем сервер через run.sh
+  // Запуск сервера через run.sh
   const command = `bash ${runScript} nogui`;
   startMinecraftServer(command, serverDir);
 }
@@ -139,7 +139,6 @@ async function getServerUrl(type, version, core) {
     case "vanilla":
       return getVanillaServerUrl(version);
     case "mods":
-      // throw new Error("Поддержка mods в процессе реализации.");
       if (!core || !["forge", "fabric"].includes(core)) {
         throw new Error(
           "Для типа 'mods' необходимо указать ядро: forge или fabric."
@@ -219,12 +218,12 @@ app.get("/stop", authenticateRequest, (req, res) => {
 function stopServer() {
   const serverProcess = getServerProcess();
   if (!serverProcess || serverProcess.killed) {
-    return false; // Сервер уже остановлен
+    return false;
   }
 
   minecraftServer("Отправлена команда stop на сервер...");
-  serverProcess.stdin.write("stop\n"); // Отправляем команду stop
-  return true; // Успешно отправлена команда
+  serverProcess.stdin.write("stop\n")
+  return true;
 }
 
 // Маршрут для сохранения мира
