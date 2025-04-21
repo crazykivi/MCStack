@@ -3,6 +3,7 @@ const fs = require("fs-extra");
 const path = require("path");
 
 let serverProcess = null; // Глобальная переменная для хранения процесса сервера
+let currentPlayerCount = 0; // Переменная для хранения количества игроков
 
 async function acceptEULA(serverDir) {
   const eulaPath = path.join(serverDir, "eula.txt");
@@ -18,7 +19,16 @@ function startMinecraftServer(command, workingDir) {
   });
 
   serverProcess.stdout.on("data", (data) => {
-    console.log(`[Minecraft Server]: ${data.toString()}`);
+    const output = data.toString(); // Преобразуем данные в строку
+    console.log(`[Minecraft Server]: ${output}`);
+
+    // Парсим вывод для подсчета игроков
+    const playerCountMatch = output.match(
+      /There are (\d+)\/\d+ players online:/
+    );
+    if (playerCountMatch) {
+      currentPlayerCount = parseInt(playerCountMatch[1], 10);
+    }
   });
 
   serverProcess.stderr.on("data", (data) => {
@@ -28,6 +38,7 @@ function startMinecraftServer(command, workingDir) {
   serverProcess.on("close", (code) => {
     console.log(`[Minecraft Server]: Процесс завершен с кодом ${code}`);
     serverProcess = null;
+    currentPlayerCount = 0; // Сбрасываем счетчик при остановке сервера
   });
 }
 
@@ -64,9 +75,44 @@ function saveMinecraftServer() {
   return true;
 }
 
+function getMemoryUsage() {
+  if (!serverProcess || serverProcess.killed) {
+    return { rss: 0, heapTotal: 0, heapUsed: 0, external: 0 };
+  }
+
+  const memoryUsage = process.memoryUsage();
+  return {
+    rss: formatBytes(memoryUsage.rss), // Resident Set Size
+    heapTotal: formatBytes(memoryUsage.heapTotal), // Общий размер кучи
+    heapUsed: formatBytes(memoryUsage.heapUsed), // Используемая куча
+    external: formatBytes(memoryUsage.external), // Память, используемая внешними библиотеками
+  };
+}
+
+// Вспомогательная функция для форматирования байтов в читаемый вид
+function formatBytes(bytes) {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
+
+// Функция для получения текущего процесса сервера
+function getServerProcess() {
+  return serverProcess;
+}
+
+function getPlayerCount() {
+  return currentPlayerCount;
+}
+
 module.exports = {
   startMinecraftServer,
   acceptEULA,
   stopMinecraftServer,
   saveMinecraftServer,
+  getServerProcess,
+  getPlayerCount,
+  getMemoryUsage,
 };

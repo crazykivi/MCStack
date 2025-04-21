@@ -1,21 +1,36 @@
 const axios = require("axios");
 const fs = require("fs-extra");
-const path = require("path");
+
+const { getForgeVersion } = require("./forge/getForgeVersion.js");
 
 async function downloadFile(url, destination) {
+  if (!isValidUrl(url)) {
+    throw new Error(`Некорректный URL для скачивания: ${url}`);
+  }
+
+  const writer = fs.createWriteStream(destination);
   const response = await axios({
     url,
+    method: "GET",
     responseType: "stream",
   });
 
-  const writer = fs.createWriteStream(destination);
   response.data.pipe(writer);
 
-  await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     writer.on("finish", resolve);
     writer.on("error", reject);
   });
 }
+
+const isValidUrl = (url) => {
+  try {
+    new URL(url);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
 
 async function getVanillaServerUrl(version) {
   const manifestUrl =
@@ -33,9 +48,21 @@ async function getVanillaServerUrl(version) {
   return versionMeta.downloads.server.url;
 }
 
-async function getModsServerUrl(version) {
-  const forgeUrl = `https://files.minecraftforge.net/net/minecraftforge/forge/index_${version}.html`;
-  throw new Error("Логика для скачивания mods еще не реализована.");
+async function getModsServerUrl(version, core) {
+  console.log(
+    `[Debug]: Вызов getModsServerUrl с параметрами: version=${version}, core=${core}`
+  );
+  switch (core) {
+    case "forge":
+      const forgeData = await getForgeVersion(version);
+      const forgeUrl = forgeData.url;
+      console.log(`[Forge]: Формируемый URL: ${forgeUrl}`);
+      return forgeData;
+
+    case "fabric":
+      console.log("Скачивание ядра fabric пока не доступно");
+      throw new Error(`Неизвестное ядро: ${core}`);
+  }
 }
 
 async function getPluginsServerUrl(version) {
@@ -43,4 +70,4 @@ async function getPluginsServerUrl(version) {
   return paperUrl;
 }
 
-module.exports = { getVanillaServerUrl, downloadFile };
+module.exports = { getVanillaServerUrl, getModsServerUrl, downloadFile };
