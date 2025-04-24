@@ -27,4 +27,5 @@ module.exports = {
   debug: createLogger("debug"),
   error: createLogger("error"),
   auth: createLogger("auth"),
+  webSocket: createLogger("webSocket"),
 };
