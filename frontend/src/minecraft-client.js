@@ -1,0 +1,531 @@
+import React, { useState, useEffect } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
+
+const ServerConsole = () => {
+  const [consoleOutput, setConsoleOutput] = useState([]);
+  const [resourceHistory, setResourceHistory] = useState([]);
+  const [minecraftVersions, setMinecraftVersions] = useState([]);
+  const [selectedVersion, setSelectedVersion] = useState("");
+  const [serverType, setServerType] = useState("vanilla");
+  const [core, setCore] = useState("");
+  const [commandInput, setCommandInput] = useState("");
+
+  // const fetchHistory = () => {
+  //   fetch("http://localhost:3001/history", {
+  //     method: "GET",
+  //     headers: {
+  //       Authorization: "123",
+  //     },
+  //   })
+  //     .then((response) => {
+  //       if (!response.ok) {
+  //         throw new Error(`HTTP error! Status: ${response.status}`);
+  //       }
+  //       return response.json();
+  //     })
+  //     .then((data) => {
+  //       const transformedData = transformDataForCharts(data);
+  //       setResourceHistory(transformedData);
+  //     })
+  //     .catch((error) => console.error("Ошибка:", error));
+  // };
+
+  useEffect(() => {
+    fetch("http://localhost:3001/frontend/minecraft-versions")
+      .then((response) => response.json())
+      .then((versions) => {
+        setMinecraftVersions(versions);
+        setSelectedVersion(versions[0]);
+      })
+      .catch((error) => console.error("Ошибка при загрузке версий:", error));
+  }, []);
+
+  const handleVersionChange = (event) => {
+    setSelectedVersion(event.target.value);
+  };
+
+  // Подключение к WebSocket
+  useEffect(() => {
+    const ws = new WebSocket("ws://localhost:3002/logs");
+
+    ws.onopen = () => {
+      console.log("WebSocket connection established");
+    };
+
+    ws.onmessage = (event) => {
+      const { type, data } = JSON.parse(event.data);
+      console.debug("Received data:", type, data);
+
+      if (type === "resources") {
+        const transformedData = transformDataForCharts(data);
+        setResourceHistory((prev) => {
+          const updatedHistory = [...prev, ...transformedData];
+          return updatedHistory.slice(-20);
+        });
+      }
+
+      if (type === "terminal") {
+        let parsedData;
+
+        if (Array.isArray(data)) {
+          parsedData = data.map((item) => ({
+            timestamp: item.timestamp || new Date().toISOString(),
+            message: (item.message || "").trim() || "No message",
+          }));
+        } else if (typeof data === "string") {
+          const match = data.match(/\[(.*?)\]\s*(.*)/);
+          if (match) {
+            parsedData = {
+              timestamp: match[1],
+              message: match[2],
+            };
+          } else {
+            parsedData = {
+              timestamp: new Date().toISOString(),
+              message: data,
+            };
+          }
+        } else {
+          parsedData = {
+            timestamp: data.timestamp || new Date().toISOString(),
+            message: (data.message || "").trim() || "No message",
+          };
+        }
+
+        setConsoleOutput((prev) => {
+          const updatedOutput = Array.isArray(parsedData)
+            ? [...prev, ...parsedData]
+            : [...prev, parsedData];
+          return updatedOutput.slice(-50);
+        });
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket connection closed");
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, []);
+
+  const formatBytes = (bytes) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  const formatDate = (date) => {
+    if (!(date instanceof Date) || isNaN(date)) {
+      return "Invalid Date";
+    }
+
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}:${month}:${year} ${hours}:${minutes}:${seconds}`;
+  };
+
+  const transformDataForCharts = (data) => {
+    const dataArray = Array.isArray(data) ? data : [data];
+
+    const formattedData = dataArray.map((entry) => ({
+      timestamp: new Date(entry.timestamp),
+      displayTimestamp: formatDate(new Date(entry.timestamp)),
+      memoryUsage: entry.memoryUsage.heapUsed / (1024 * 1024),
+      cpuUsage: parseFloat(parseFloat(entry.cpuUsage).toFixed(3)),
+    }));
+
+    if (formattedData.length > 40) {
+      return averageDataByInterval(formattedData, 10);
+    }
+
+    return formattedData;
+  };
+
+  const averageDataByInterval = (data, intervalMinutes = 10) => {
+    const groupedData = {};
+
+    data.forEach((entry) => {
+      const date = new Date(entry.timestamp);
+      const intervalStart = new Date(
+        Math.floor(date.getTime() / (intervalMinutes * 60 * 1000)) *
+          (intervalMinutes * 60 * 1000)
+      );
+
+      const intervalKey = intervalStart.toISOString();
+
+      if (!groupedData[intervalKey]) {
+        groupedData[intervalKey] = {
+          timestamp: intervalStart,
+          memoryUsageSum: 0,
+          cpuUsageSum: 0,
+          count: 0,
+        };
+      }
+
+      groupedData[intervalKey].memoryUsageSum += entry.memoryUsage;
+      groupedData[intervalKey].cpuUsageSum += entry.cpuUsage;
+      groupedData[intervalKey].count += 1;
+    });
+
+    return Object.values(groupedData).map((group) => ({
+      timestamp: group.timestamp,
+      memoryUsage: parseFloat((group.memoryUsageSum / group.count).toFixed(3)),
+      cpuUsage: parseFloat((group.cpuUsageSum / group.count).toFixed(3)),
+    }));
+  };
+
+  const handleStart = () => {
+    const queryParams = new URLSearchParams({
+      type: serverType,
+      version: selectedVersion,
+      ...(serverType === "mods" && { core }),
+    }).toString();
+
+    fetch(`http://localhost:3001/start?${queryParams}`, {
+      method: "GET",
+      headers: {
+        Authorization: "123",
+      },
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.text();
+      })
+      .then((data) => {
+        console.debug("Сервер запущен:", data);
+      })
+      .catch((error) => {
+        console.error("Ошибка при запуске сервера:", error);
+      });
+  };
+
+  const handleCommandSubmit = () => {
+    if (!commandInput.trim()) {
+      console.warn("Команда пуста");
+      return;
+    }
+
+    const command = commandInput.trim();
+
+    // Зарезервированные команды
+    if (["save", "restart", "stop"].includes(command)) {
+      fetch(`http://localhost:3001/${command}`, {
+        method: "GET",
+        headers: {
+          Authorization: "123",
+        },
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.text();
+        })
+        .then((data) => {
+          console.log(`Команда "${command}" выполнена:`, data);
+        })
+        .catch((error) => {
+          console.error(`Ошибка при выполнении команды "${command}":`, error);
+        });
+    } else {
+      // Отправка произвольной команды
+      fetch("http://localhost:3001/command", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "123",
+        },
+        body: JSON.stringify({ command }),
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          return response.text();
+        })
+        .then((data) => {
+          console.log(`Команда "${command}" выполнена:`, data);
+        })
+        .catch((error) => {
+          console.error(`Ошибка при выполнении команды "${command}":`, error);
+        });
+    }
+
+    setCommandInput("");
+  };
+
+  const handleRestart = () => {
+    const queryParams = new URLSearchParams({
+      type: serverType,
+      version: selectedVersion,
+      ...(serverType === "mods" && { core }),
+    }).toString();
+
+    fetch(`http://localhost:3001/restart?${queryParams}`, {
+      method: "GET",
+      headers: {
+        Authorization: "123",
+      },
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.text();
+      })
+      .then((data) => {
+        console.debug("Сервер перезапущен:", data);
+      })
+      .catch((error) => {
+        console.error("Ошибка при запуске сервера:", error);
+      });
+  };
+
+  const handleStop = () => {
+    fetch(`http://localhost:3001/stop`, {
+      method: "GET",
+      headers: {
+        Authorization: "123",
+      },
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.text();
+      })
+      .then((data) => {
+        console.debug("Сервер остановлен:", data);
+      })
+      .catch((error) => {
+        console.error("Ошибка при запуске сервера:", error);
+      });
+  };
+
+  // const handleKill = () => {
+  //   console.log("Kill button clicked");
+  // };
+
+  return (
+    <div className="flex h-screen">
+      {/* <div className="w-64 bg-gray-200 p-4">
+        <ul>
+          <li className="py-2">
+            <a href="#" className="text-blue-600">
+              Настроить аккаунт
+            </a>
+          </li>
+          <li className="py-2">
+            <a href="#" className="text-blue-600">
+              Панель доступа
+            </a>
+          </li>
+          <li className="py-2">
+            <a href="#" className="text-blue-600">
+              API достп
+            </a>
+          </li>
+          <li className="py-2">
+            <a href="#" className="text-blue-600">
+              Мои миры
+            </a>
+          </li>
+          <li className="py-2">
+            <a href="#" className="text-blue-600">
+              Консоль
+            </a>
+          </li>
+          <li className="py-2">
+            <a href="#" className="text-blue-600">
+              Файловы менеджер
+            </a>
+          </li>
+          <li className="py-2">
+            <a href="#" className="text-blue-600">
+            Управление задачами
+            </a>
+          </li>
+          <li className="py-2">
+            <a href="#" className="text-blue-600">
+              Конфигурация
+            </a>
+          </li>
+        </ul>
+      </div> */}
+      <div className="flex-1 p-4">
+        <div className="bg-white p-1 mb-4">
+          <h2 className="text-lg font-bold mb-1">Управление сервером</h2>
+          <p className="text-gray-600 mb-1">
+            Панель для управления сервером в реальном времени
+          </p>
+          <div className="flex justify-end mb-1">
+            <label className="mr-2 text-gray-600">Тип сервера:</label>
+            <select
+              value={serverType}
+              onChange={(e) => setServerType(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 mr-4"
+            >
+              <option value="vanilla">Vanilla</option>
+              <option value="mods">Mods</option>
+            </select>
+            {serverType === "mods" && (
+              <>
+                <label className="mr-2 text-gray-600">Ядро:</label>
+                <select
+                  value={core}
+                  onChange={(e) => setCore(e.target.value)}
+                  className="border border-gray-300 rounded px-2 py-1"
+                >
+                  <option value="forge">Forge</option>
+                  {/* Другие ядра позже будут*/}
+                </select>
+              </>
+            )}
+            <label className="mr-2 text-gray-600">Выберите версию:</label>
+            <select
+              value={selectedVersion}
+              onChange={handleVersionChange}
+              className="border border-gray-300 rounded px-2 py-1"
+            >
+              {minecraftVersions.map((version) => (
+                <option key={version} value={version}>
+                  {version}
+                </option>
+              ))}
+            </select>
+          </div>
+          {/* <div className="bg-black p-4 text-white overflow-y-auto h-96"> */}
+          <div
+            className="bg-black p-4 text-white overflow-y-auto"
+            style={{ height: "430px" }}
+          >
+            <ul>
+              {consoleOutput.map((line, index) => {
+                const timestamp = line.timestamp
+                  ? formatDate(new Date(line.timestamp))
+                  : "Invalid Date";
+                const message = (line.message || "").trim();
+
+                return (
+                  <li key={index}>
+                    <span className="font-bold">{timestamp}</span> {message}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+          <div className="flex mt-1">
+            <input
+              type="text"
+              value={commandInput}
+              onChange={(e) => setCommandInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleCommandSubmit();
+              }}
+              placeholder="Введите команду..."
+              className="flex-1 border border-gray-300 rounded px-2 py-1 mr-2"
+            />
+            <button
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              onClick={handleCommandSubmit}
+            >
+              Отправить
+            </button>
+          </div>
+
+          <div className="flex justify-end mt-4">
+            <button
+              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+              onClick={handleStart}
+            >
+              Запустить
+            </button>
+            <button
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mx-2"
+              onClick={handleRestart}
+            >
+              Рестарт
+            </button>
+            <button
+              className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+              onClick={handleStop}
+            >
+              Остановить
+            </button>
+            {/* <button className="bg-red-800 hover:bg-red-900 text-white font-bold py-2 px-4 rounded mx-2">
+              Kill
+            </button> */}
+          </div>
+        </div>
+        <div className="flex-1 flex justify-between">
+          <div className="w-1/2 p-4 bg-white">
+            <h2 className="text-lg font-bold mb-2">Memory Usage</h2>
+            <LineChart width={400} height={200} data={resourceHistory}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="timestamp" />
+              <YAxis />
+              <Tooltip
+                formatter={(value, name) => {
+                  if (name === "memoryUsage") {
+                    return [
+                      `${formatBytes(value * 1024 * 1024)}`,
+                      "Memory Usage",
+                    ];
+                  }
+                  return [value, name];
+                }}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="memoryUsage"
+                stroke="#8884d8"
+                activeDot={{ r: 8 }}
+              />
+            </LineChart>
+          </div>
+          <div className="w-1/2 p-4 bg-white">
+            <h2 className="text-lg font-bold mb-2">CPU Usage</h2>
+            <LineChart width={400} height={200} data={resourceHistory}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="timestamp" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="cpuUsage"
+                stroke="#82ca9d"
+                activeDot={{ r: 8 }}
+              />
+            </LineChart>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ServerConsole;

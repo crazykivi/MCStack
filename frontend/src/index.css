@@ -1,0 +1,56 @@
+src/index.css body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.h-screen {
+  height: 50vh;
+}
+
+.object-cover {
+  height: 80vh;
+}
+
+
+@media screen and (min-width: 768px) {
+  .hover-effect {
+    overflow: hidden;
+  }
+
+  .hover-effect a {
+    display: inline-block;
+    position: relative;
+    padding: 0.5rem 1rem;
+    background-color: transparent;
+    border-radius: 0.25rem;
+    transition: transform 0.5s ease-in-out, opacity 0.5s ease-in-out;
+    transform-origin: left;
+  }
+
+  .hover-effect a:hover {
+    transform: translateX(20px);
+    opacity: 0.5;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .h-screen {
+    height: 20vh;
+  }
+  .object-cover {
+    height: auto;
+  }
+}

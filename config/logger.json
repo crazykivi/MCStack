@@ -9,6 +9,7 @@
       "minecraftServer": true,
       "vanilla": true,
       "forge": true,
-      "fabric": true
+      "fabric": true,
+      "webSocket": false
     }
   }
