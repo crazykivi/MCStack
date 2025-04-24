@@ -1,5 +1,7 @@
 const express = require("express");
+const os = require("os");
 const fs = require("fs-extra");
+const cors = require("cors");
 const path = require("path");
 const {
   getVanillaServerUrl,
@@ -10,7 +12,6 @@ const { downloadAndExtractJava } = require("./utils/downloadJava");
 const {
   startMinecraftServer,
   acceptEULA,
-  stopMinecraftServer,
   saveMinecraftServer,
   getServerProcess,
   getPlayerCount,
@@ -28,8 +29,9 @@ const {
   java,
   vanilla,
   forge,
-  debug,
 } = require("./utils/logger");
+const { getHistory, startResourceMonitoring, stopResourceMonitoring } = require("./utils/resourceHistory");
+const minecraftVersionsRouter = require("./utils/frontend/MinecraftVersions");
 
 const app = express();
 const PORT = 3001;
@@ -41,6 +43,7 @@ function getDefaultParams(query) {
 }
 
 app.use(express.json());
+app.use(cors());
 
 // Глобальный объект для хранения состояния сервера
 const serverState = {
@@ -199,7 +202,8 @@ async function startServer(type, version, core = null) {
   } else {
     throw new Error(`Неизвестный тип сервера: ${type}`);
   }
-
+  
+  startResourceMonitoring(getServerProcess, getPlayerCount, getMemoryUsage);
   minecraftServer(
     `Сервер Minecraft ${type} версии ${version} успешно запущен.`
   );
@@ -222,11 +226,11 @@ function stopServer() {
   }
 
   minecraftServer("Отправлена команда stop на сервер...");
-  serverProcess.stdin.write("stop\n")
+  serverProcess.stdin.write("stop\n");
+  stopResourceMonitoring();
   return true;
 }
 
-// Маршрут для сохранения мира
 app.get("/save", authenticateRequest, (req, res) => {
   const saved = saveMinecraftServer();
   if (saved) {
@@ -274,20 +278,22 @@ app.get("/status", authenticateRequest, async (req, res) => {
 
     const playersOnline = await getPlayerCount();
     const memoryUsage = getMemoryUsage();
+    const cpuLoad = os.loadavg()[0];
 
     res.json({
       status: isRunning ? "running" : "stopped",
       playersOnline: playersOnline,
       memoryUsage: memoryUsage,
+      cpuUsage: cpuLoad.toFixed(2),
     });
-
-    debug(`Server status: ${isRunning ? "running" : "stopped"}`);
-    debug(`Players online: ${playersOnline}`);
-    debug(`Memory usage:`, memoryUsage);
   } catch (error) {
-    commandError("Error occurred:", error);
+    console.error("Error occurred:", error);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+app.get("/history", authenticateRequest, (req, res) => {
+  res.json(getHistory());
 });
 
 app.post("/command", authenticateRequest, (req, res) => {
@@ -316,6 +322,10 @@ function sendCommandToServer(command) {
   minecraftServerProcess.stdin.write(`${command}\n`);
   commandSent(`[Command Sent]: ${command}`);
 }
+
+app.use("/frontend", minecraftVersionsRouter);
+
+require("./utils/websocketServer");
 
 app.listen(PORT, () => {
   console.log(`API запущено на http://localhost:${PORT}`);
