@@ -5,6 +5,7 @@ services:
     ports:
       - "3001:3001"
       - "25565:25565"
+      - "3002:3002"
     volumes:
       - ./server:/app/server
     restart: always
