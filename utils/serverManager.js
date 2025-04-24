@@ -1,7 +1,7 @@
 const { spawn } = require("child_process");
 const fs = require("fs-extra");
 const path = require("path");
-const { minecraftServer } = require("./logger")
+const { minecraftServer } = require("./logger");
 
 let serverProcess = null; // Глобальная переменная для хранения процесса сервера
 let currentPlayerCount = 0; // Переменная для хранения количества игроков
@@ -20,10 +20,10 @@ function startMinecraftServer(command, workingDir) {
   });
 
   serverProcess.stdout.on("data", (data) => {
-    const output = data.toString(); // Преобразуем данные в строку
+    const output = data.toString();
     minecraftServer(`${output}`);
 
-    // Парсим вывод для подсчета игроков
+    // Парсинг вывода для подсчета игроков
     const playerCountMatch = output.match(
       /There are (\d+)\/\d+ players online:/
     );
@@ -65,17 +65,6 @@ function saveMinecraftServer() {
   return true;
 }
 
-function saveMinecraftServer() {
-  if (!serverProcess) {
-    minecraftServer("Сервер не запущен.");
-    return false;
-  }
-
-  minecraftServer("Отправка команды save-all...");
-  serverProcess.stdin.write("save-all\n");
-  return true;
-}
-
 function getMemoryUsage() {
   if (!serverProcess || serverProcess.killed) {
     return { rss: 0, heapTotal: 0, heapUsed: 0, external: 0 };
@@ -83,20 +72,11 @@ function getMemoryUsage() {
 
   const memoryUsage = process.memoryUsage();
   return {
-    rss: formatBytes(memoryUsage.rss), // Общий объём памяти
-    heapTotal: formatBytes(memoryUsage.heapTotal), // Общий размер кучи для JavaScript-объектов (NodeJS)
-    heapUsed: formatBytes(memoryUsage.heapUsed), // Фактическое использование в куче
-    external: formatBytes(memoryUsage.external), // Память, используемая внешними библиотеками (NodeJS)
+    rss: memoryUsage.rss, // Общий объём памяти (в байтах)
+    heapTotal: memoryUsage.heapTotal, // Общий размер кучи (в байтах)
+    heapUsed: memoryUsage.heapUsed, // Фактическое использование в куче (в байтах)
+    external: memoryUsage.external, // Память, используемая внешними библиотеками (в байтах)
   };
-}
-
-// Вспомогательная функция для форматирования байтов в читаемый вид
-function formatBytes(bytes) {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
 function getServerProcess() {
@@ -116,7 +96,9 @@ function getPlayerCount() {
     const handleOutput = (data) => {
       const output = data.toString().trim();
 
-      const playerListMatch = output.match(/There are (\d+) of a max of (\d+) players online:/);
+      const playerListMatch = output.match(
+        /There are (\d+) of a max of (\d+) players online:/
+      );
       if (playerListMatch) {
         const currentPlayers = parseInt(playerListMatch[1], 10);
         const maxPlayers = parseInt(playerListMatch[2], 10);
