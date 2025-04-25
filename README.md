@@ -30,7 +30,7 @@
 - Склонируйте репозиторий:
 
 ```bash
-git clone https://github.com/your-repo/minecraft-backend.git
+git clone https://github.com/crazykivi/minecraft-backend.git
 cd minecraft-backend
 ```
 
