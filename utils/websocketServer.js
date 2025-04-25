@@ -10,6 +10,7 @@ const {
   addServerLog,
   getServerLogs,
 } = require("./resourceHistory");
+const { getUserByToken } = require("../utils/db");
 
 // Далее будет изменено, чтобы можно было выбирать, куда сохраняются логи
 const LOGS_DIR = path.join(__dirname, "../logs");
@@ -21,6 +22,8 @@ if (!fs.existsSync(LOGS_DIR)) {
 }
 
 let terminalLogsBuffer = [];
+// Инициализация WebSocket-сервера
+const wss = new WebSocket.Server({ port: 3002 });
 
 try {
   const logsData = fs.readFileSync(LOGS_FILE_PATH, "utf8");
@@ -30,8 +33,6 @@ try {
   terminalLogsBuffer = [];
 }
 
-// Инициализация WebSocket-сервера
-const wss = new WebSocket.Server({ port: 3002 });
 
 const broadcastTerminalData = (message) => {
   const logEntry = {
@@ -41,8 +42,8 @@ const broadcastTerminalData = (message) => {
 
   terminalLogsBuffer.push(logEntry);
 
-  if (terminalLogsBuffer.length > 200) {
-    terminalLogsBuffer = terminalLogsBuffer.slice(-200);
+  if (terminalLogsBuffer.length > 1000) {
+    terminalLogsBuffer = terminalLogsBuffer.slice(-1000);
   }
 
   fs.writeFileSync(LOGS_FILE_PATH, JSON.stringify(terminalLogsBuffer));
@@ -65,8 +66,30 @@ captureTerminal(broadcastTerminalData);
 //   });
 // };
 
-wss.on("connection", (ws) => {
+wss.on("connection", async (ws, req) => {
   webSocket("WebSocket client connected");
+
+  const token = new URLSearchParams(req.url.split("?")[1]).get("token");
+
+  if (!token) {
+    ws.close();
+    return;
+  }
+
+  try {
+    const user = await getUserByToken(token);
+    if (!user) {
+      ws.close();
+      return;
+    }
+
+    ws.isAuthorized = true;
+    ws.userId = user.id;
+    webSocket(`Аутентификация WebSocket успешна для пользователя ID: ${user.id}`);
+  } catch (error) {
+    console.error("Ошибка при аутентификации WebSocket:", error.message);
+    ws.close();
+  }
 
   // 20 последних записей из терминала
   const last20Logs = terminalLogsBuffer.slice(-20);

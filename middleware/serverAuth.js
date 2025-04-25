@@ -1,23 +1,37 @@
-require('dotenv').config();
-const { auth } = require("../utils/logger")
+require("dotenv").config();
+const { auth } = require("../utils/logger");
+const bcrypt = require("bcrypt");
+const {
+  createUser,
+  getUserByUsername,
+  verifyPassword,
+  getUserByToken,
+  getUserCount,
+  updateUserToken,
+} = require("../utils/db");
 
-function authenticateRequest(req, res, next) {
-  const requiredPassword = process.env.API_PASSWORD;
+async function authenticateRequest(req, res, next) {
+  const token = req.headers.authorization || req.body.token;
 
-  if (!requiredPassword) {
-    // console.log("Аутентификация отключена (пароль не задан).");
-    return next();
+  if (!token) {
+    auth("Токен не предоставлен.");
+    return res.status(401).send("Ошибка: Необходимо пройти аутентификацию.");
   }
 
-  const providedPassword = req.headers.authorization;
+  try {
+    const user = await getUserByToken(token);
+    if (!user) {
+      auth("Неверный токен.");
+      return res.status(401).send("Ошибка: Неверный токен.");
+    }
 
-  if (providedPassword === requiredPassword) {
-    auth("Аутентификация успешна.");
+    req.user = user;
+    auth(`Аутентификация успешна для пользователя ${user.username}.`);
     return next();
+  } catch (error) {
+    console.error("Ошибка при аутентификации:", error.message);
+    return res.status(500).send("Ошибка сервера.");
   }
-
-  auth("Аутентификация не пройдена.");
-  return res.status(401).send("Ошибка: Необходимо пройти аутентификацию.");
 }
 
 module.exports = { authenticateRequest };

@@ -17,26 +17,7 @@ const ServerConsole = () => {
   const [serverType, setServerType] = useState("vanilla");
   const [core, setCore] = useState("");
   const [commandInput, setCommandInput] = useState("");
-
-  // const fetchHistory = () => {
-  //   fetch("http://localhost:3001/history", {
-  //     method: "GET",
-  //     headers: {
-  //       Authorization: "123",
-  //     },
-  //   })
-  //     .then((response) => {
-  //       if (!response.ok) {
-  //         throw new Error(`HTTP error! Status: ${response.status}`);
-  //       }
-  //       return response.json();
-  //     })
-  //     .then((data) => {
-  //       const transformedData = transformDataForCharts(data);
-  //       setResourceHistory(transformedData);
-  //     })
-  //     .catch((error) => console.error("Ошибка:", error));
-  // };
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetch("http://localhost:3001/frontend/minecraft-versions")
@@ -52,73 +33,95 @@ const ServerConsole = () => {
     setSelectedVersion(event.target.value);
   };
 
+  useEffect(() => {
+    if (serverType === "mods") {
+      setCore("forge");
+    }
+  }, [serverType]);
+
   // Подключение к WebSocket
   useEffect(() => {
-    const ws = new WebSocket("ws://localhost:3002/logs");
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.error("Токен не найден. Пожалуйста, войдите в систему.");
+      return;
+    }
 
-    ws.onopen = () => {
-      console.log("WebSocket connection established");
-    };
+    let ws;
+    setIsLoading(true);
 
-    ws.onmessage = (event) => {
-      const { type, data } = JSON.parse(event.data);
-      console.debug("Received data:", type, data);
+    const timeoutId = setTimeout(() => {
+      ws = new WebSocket(`ws://localhost:3002/logs?token=${token}`);
 
-      if (type === "resources") {
-        const transformedData = transformDataForCharts(data);
-        setResourceHistory((prev) => {
-          const updatedHistory = [...prev, ...transformedData];
-          return updatedHistory.slice(-20);
-        });
-      }
+      ws.onopen = () => {
+        console.log("WebSocket connection established");
+      };
 
-      if (type === "terminal") {
-        let parsedData;
+      ws.onmessage = (event) => {
+        setIsLoading(false);
+        const { type, data } = JSON.parse(event.data);
 
-        if (Array.isArray(data)) {
-          parsedData = data.map((item) => ({
-            timestamp: item.timestamp || new Date().toISOString(),
-            message: (item.message || "").trim() || "No message",
-          }));
-        } else if (typeof data === "string") {
-          const match = data.match(/\[(.*?)\]\s*(.*)/);
-          if (match) {
-            parsedData = {
-              timestamp: match[1],
-              message: match[2],
-            };
-          } else {
-            parsedData = {
-              timestamp: new Date().toISOString(),
-              message: data,
-            };
-          }
-        } else {
-          parsedData = {
-            timestamp: data.timestamp || new Date().toISOString(),
-            message: (data.message || "").trim() || "No message",
-          };
+        if (type === "resources") {
+          const transformedData = transformDataForCharts(data);
+          setResourceHistory((prev) => {
+            const updatedHistory = [...prev, ...transformedData];
+            return updatedHistory.slice(-20);
+          });
         }
 
-        setConsoleOutput((prev) => {
-          const updatedOutput = Array.isArray(parsedData)
-            ? [...prev, ...parsedData]
-            : [...prev, parsedData];
-          return updatedOutput.slice(-50);
-        });
-      }
-    };
+        if (type === "terminal") {
+          let parsedData;
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-    };
+          if (Array.isArray(data)) {
+            parsedData = data.map((item) => ({
+              timestamp: item.timestamp || new Date().toISOString(),
+              message: (item.message || "").trim() || "No message",
+            }));
+          } else if (typeof data === "string") {
+            const match = data.match(/\[(.*?)\]\s*(.*)/);
+            if (match) {
+              parsedData = {
+                timestamp: match[1],
+                message: match[2],
+              };
+            } else {
+              parsedData = {
+                timestamp: new Date().toISOString(),
+                message: data,
+              };
+            }
+          } else {
+            parsedData = {
+              timestamp: data.timestamp || new Date().toISOString(),
+              message: (data.message || "").trim() || "No message",
+            };
+          }
 
-    ws.onclose = () => {
-      console.log("WebSocket connection closed");
-    };
+          setConsoleOutput((prev) => {
+            const updatedOutput = Array.isArray(parsedData)
+              ? [...prev, ...parsedData]
+              : [...prev, parsedData];
+            return updatedOutput.slice(-50);
+          });
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setIsLoading(false);
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket connection closed");
+        setIsLoading(false);
+      };
+    }, 1000);
 
     return () => {
-      ws.close();
+      clearTimeout(timeoutId);
+      if (ws) {
+        ws.close();
+      }
     };
   }, []);
 
@@ -195,16 +198,30 @@ const ServerConsole = () => {
   };
 
   const handleStart = () => {
+    const currentCore = core;
+    console.log(currentCore);
+    if (serverType === "mods" && !currentCore) {
+      alert("Для типа 'mods' необходимо выбрать ядро (Forge).");
+      return;
+    }
+
     const queryParams = new URLSearchParams({
       type: serverType,
       version: selectedVersion,
-      ...(serverType === "mods" && { core }),
+      core: currentCore,
     }).toString();
+    console.log(queryParams);
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      console.error("Токен не найден. Пожалуйста, войдите в систему.");
+      return;
+    }
 
     fetch(`http://localhost:3001/start?${queryParams}`, {
       method: "GET",
       headers: {
-        Authorization: "123",
+        Authorization: token,
       },
     })
       .then((response) => {
@@ -229,12 +246,19 @@ const ServerConsole = () => {
 
     const command = commandInput.trim();
 
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      console.error("Токен не найден. Пожалуйста, войдите в систему.");
+      return;
+    }
+
     // Зарезервированные команды
     if (["save", "restart", "stop"].includes(command)) {
       fetch(`http://localhost:3001/${command}`, {
         method: "GET",
         headers: {
-          Authorization: "123",
+          Authorization: token,
         },
       })
         .then((response) => {
@@ -255,7 +279,7 @@ const ServerConsole = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: "123",
+          Authorization: token,
         },
         body: JSON.stringify({ command }),
       })
@@ -283,10 +307,17 @@ const ServerConsole = () => {
       ...(serverType === "mods" && { core }),
     }).toString();
 
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      console.error("Токен не найден. Пожалуйста, войдите в систему.");
+      return;
+    }
+
     fetch(`http://localhost:3001/restart?${queryParams}`, {
       method: "GET",
       headers: {
-        Authorization: "123",
+        Authorization: token,
       },
     })
       .then((response) => {
@@ -304,10 +335,17 @@ const ServerConsole = () => {
   };
 
   const handleStop = () => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      console.error("Токен не найден. Пожалуйста, войдите в систему.");
+      return;
+    }
+
     fetch(`http://localhost:3001/stop`, {
       method: "GET",
       headers: {
-        Authorization: "123",
+        Authorization: token,
       },
     })
       .then((response) => {
@@ -330,6 +368,11 @@ const ServerConsole = () => {
 
   return (
     <div className="flex h-screen">
+      {isLoading && (
+        <div className="absolute inset-0 flex justify-center items-center bg-black bg-opacity-75 z-50">
+          <div className="loader"></div>
+        </div>
+      )}
       {/* <div className="w-64 bg-gray-200 p-4">
         <ul>
           <li className="py-2">
@@ -395,11 +438,15 @@ const ServerConsole = () => {
                 <label className="mr-2 text-gray-600">Ядро:</label>
                 <select
                   value={core}
-                  onChange={(e) => setCore(e.target.value)}
+                  onChange={(e) => {
+                    const selectedCore = e.target.value;
+                    console.log("Выбранное ядро:", selectedCore);
+                    setCore(selectedCore);
+                  }}
                   className="border border-gray-300 rounded px-2 py-1"
                 >
                   <option value="forge">Forge</option>
-                  {/* Другие ядра позже будут*/}
+                  {/* Другие ядра позже будут */}
                 </select>
               </>
             )}
@@ -416,7 +463,7 @@ const ServerConsole = () => {
               ))}
             </select>
           </div>
-          {/* <div className="bg-black p-4 text-white overflow-y-auto h-96"> */}
+          {/* БЕЗ ЗАГРУЗКИ */}
           <div
             className="bg-black p-4 text-white overflow-y-auto"
             style={{ height: "430px" }}
@@ -436,6 +483,31 @@ const ServerConsole = () => {
               })}
             </ul>
           </div>
+          {/* СО СЛОВОМ ЗАГРУЗКИ */}
+          {/* <div
+            className="bg-black p-4 text-white overflow-y-auto"
+            style={{ height: "430px" }}
+          >
+            {isLoading ? (
+              <div className="flex justify-center items-center h-full">
+                <div className="loader"></div>
+              </div>
+            ) : (
+              <ul>
+                {consoleOutput.map((line, index) => {
+                  const timestamp = line.timestamp
+                    ? formatDate(new Date(line.timestamp))
+                    : "Invalid Date";
+                  const message = (line.message || "").trim();
+                  return (
+                    <li key={index}>
+                      <span className="font-bold">{timestamp}</span> {message}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div> */}
           <div className="flex mt-1">
             <input
               type="text"

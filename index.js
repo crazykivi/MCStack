@@ -3,6 +3,8 @@ const os = require("os");
 const fs = require("fs-extra");
 const cors = require("cors");
 const path = require("path");
+require('dotenv').config();
+const authRoutes = require("./routes/auth");
 const {
   getVanillaServerUrl,
   getModsServerUrl,
@@ -324,6 +326,7 @@ function sendCommandToServer(command) {
 }
 
 app.use("/frontend", minecraftVersionsRouter);
+app.use("/auth", authRoutes);
 
 require("./utils/websocketServer");
 
