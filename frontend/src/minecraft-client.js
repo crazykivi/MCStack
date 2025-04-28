@@ -446,6 +446,7 @@ const ServerConsole = () => {
                   className="border border-gray-300 rounded px-2 py-1"
                 >
                   <option value="forge">Forge</option>
+                  <option value="fabric">Fabric</option>
                   {/* Другие ядра позже будут */}
                 </select>
               </>

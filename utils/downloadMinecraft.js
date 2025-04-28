@@ -2,7 +2,8 @@ const axios = require("axios");
 const fs = require("fs-extra");
 
 const { getForgeVersion } = require("./mods/getForgeVersion.js");
-const { debug, forge, fabric } = require("./logger")
+const { getFabricVersion } = require("./mods/getFabricVersion.js");
+const { debug, forge, fabric } = require("./logger");
 
 async function downloadFile(url, destination) {
   if (!isValidUrl(url)) {
@@ -61,8 +62,10 @@ async function getModsServerUrl(version, core) {
       return forgeData;
 
     case "fabric":
-      fabric("Скачивание ядра fabric пока не доступно");
-      throw new Error(`Неизвестное ядро: ${core}`);
+      const fabricData = await getFabricVersion(version);
+      const fabricUrl = fabricData.url;
+      fabric(`Формируемый URL: ${fabricUrl}`);
+      return fabricData;
   }
 }
 

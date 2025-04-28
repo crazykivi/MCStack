@@ -1,14 +1,7 @@
 require("dotenv").config();
 const { auth } = require("../utils/logger");
 const bcrypt = require("bcrypt");
-const {
-  createUser,
-  getUserByUsername,
-  verifyPassword,
-  getUserByToken,
-  getUserCount,
-  updateUserToken,
-} = require("../utils/db");
+const { getUserByToken } = require("../utils/db");
 
 async function authenticateRequest(req, res, next) {
   const token = req.headers.authorization || req.body.token;

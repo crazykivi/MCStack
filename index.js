@@ -3,7 +3,7 @@ const os = require("os");
 const fs = require("fs-extra");
 const cors = require("cors");
 const path = require("path");
-require('dotenv').config();
+require("dotenv").config();
 const authRoutes = require("./routes/auth");
 const {
   getVanillaServerUrl,
@@ -31,8 +31,13 @@ const {
   java,
   vanilla,
   forge,
+  fabric,
 } = require("./utils/logger");
-const { getHistory, startResourceMonitoring, stopResourceMonitoring } = require("./utils/resourceHistory");
+const {
+  getHistory,
+  startResourceMonitoring,
+  stopResourceMonitoring,
+} = require("./utils/resourceHistory");
 const minecraftVersionsRouter = require("./utils/frontend/MinecraftVersions");
 
 const app = express();
@@ -116,6 +121,55 @@ async function startForgeServer(serverDir, version, core, javaPath) {
   startMinecraftServer(command, serverDir);
 }
 
+async function startFabricServer(serverDir, version, core, javaPath) {
+  try {
+    // Получение данных об установщике Fabric
+    const installerData = await getServerUrl("mods", version, core);
+    const installerUrl = installerData.url;
+    const installerJarPath = path.join(serverDir, "fabric-installer.jar");
+
+    fabric(`Скачивание установщика Fabric версии ${installerData.version}...`);
+    await downloadFile(installerUrl, installerJarPath);
+    fabric(`Установщик Fabric успешно скачан: ${installerJarPath}`);
+
+    // Установка Fabric через установщик
+    fabric("Установка Fabric...");
+    const installCommand = `${javaPath} -jar fabric-installer.jar server -dir ${serverDir} -mcversion ${version}`;
+    await executeCommand(installCommand, serverDir);
+    fabric("Fabric успешно установлен.");
+
+    // Скачивание официального серверного JAR Minecraft
+    const vanillaServerUrl = await getVanillaServerUrl(version);
+    const serverJarPath = path.join(serverDir, "server.jar");
+    fabric(
+      `Скачивание официального серверного JAR Minecraft: ${vanillaServerUrl}`
+    );
+    await downloadFile(vanillaServerUrl, serverJarPath);
+    fabric(`Серверный JAR Minecraft успешно скачан: ${serverJarPath}`);
+
+    // Проверка наличия fabric-server-launch.jar после установки
+    const serverLaunchJarPath = path.join(
+      serverDir,
+      "fabric-server-launch.jar"
+    );
+    if (!fs.existsSync(serverLaunchJarPath)) {
+      throw new Error(
+        "Файл fabric-server-launch.jar не найден после установки Fabric."
+      );
+    }
+
+    // Формирование команды для запуска сервера
+    const memoryOptions = `-Xmx${config.maxMemory} -Xms${config.minMemory}`;
+    const command = `${javaPath} ${memoryOptions} -jar fabric-server-launch.jar nogui`;
+
+    fabric(`Запуск сервера с командой: ${command}`);
+    startMinecraftServer(command, serverDir);
+  } catch (error) {
+    fabric(`Ошибка при запуске Fabric-сервера: ${error.message}`);
+    throw error;
+  }
+}
+
 async function executeCommand(command, cwd) {
   return new Promise((resolve, reject) => {
     const [executable, ...args] = command.split(" ");
@@ -182,34 +236,59 @@ app.get("/start", authenticateRequest, async (req, res) => {
 });
 
 async function startServer(type, version, core = null) {
-  const requiredJavaVersion = getRequiredJavaVersion(version);
-  java(`Требуемая версия Java: ${requiredJavaVersion}`);
+  try {
+    const requiredJavaVersion = getRequiredJavaVersion(version);
+    java(`Требуемая версия Java: ${requiredJavaVersion}`);
 
-  const javaPath = await downloadAndExtractJava(requiredJavaVersion);
+    const javaPath = await downloadAndExtractJava(requiredJavaVersion);
 
-  const serverDir = path.join(
-    __dirname,
-    config.serverDirectory,
-    `${type}-${version}`
-  );
-  await fs.ensureDir(serverDir);
+    const serverDir = path.join(
+      __dirname,
+      config.serverDirectory,
+      `${type}-${version}`
+    );
+    await fs.ensureDir(serverDir);
 
-  await prepareServerEnvironment(serverDir, type, version, core, javaPath);
+    await prepareServerEnvironment(serverDir, type, version, core, javaPath);
 
-  let command;
-  if (type === "vanilla") {
-    command = await startVanillaServer(serverDir, version, core, javaPath);
-  } else if (type === "mods" && core === "forge") {
-    command = await startForgeServer(serverDir, version, core, javaPath);
-  } else {
-    throw new Error(`Неизвестный тип сервера: ${type}`);
+    // Объекты выбора команд
+    const commandHandlers = {
+      vanilla: async () =>
+        await startVanillaServer(serverDir, version, core, javaPath),
+      mods: {
+        forge: async () =>
+          await startForgeServer(serverDir, version, core, javaPath),
+        fabric: async () =>
+          await startFabricServer(serverDir, version, core, javaPath),
+      },
+    };
+
+    // Проверка типа сервера
+    if (!commandHandlers[type]) {
+      throw new Error(`Неизвестный тип сервера: ${type}`);
+    }
+
+    // Если mods, проверка поддерживаемого ядра
+    if (type === "mods" && !commandHandlers.mods[core]) {
+      throw new Error(`Неизвестное ядро для модов: ${core}`);
+    }
+
+    // Выбор и выполнение соответствующей команды
+    const handler =
+      type === "mods" ? commandHandlers.mods[core] : commandHandlers[type];
+    const result = await handler();
+
+    startResourceMonitoring(getServerProcess, getPlayerCount, getMemoryUsage);
+
+    minecraftServer(
+      `Сервер Minecraft ${type} версии ${version} успешно запущен.`
+    );
+
+    return result;
+  } catch (error) {
+    console.error(`Ошибка при запуске сервера: ${error.message}`);
+    throw error;
   }
-  
-  startResourceMonitoring(getServerProcess, getPlayerCount, getMemoryUsage);
-  minecraftServer(
-    `Сервер Minecraft ${type} версии ${version} успешно запущен.`
-  );
-  return command;
 }
 
 app.get("/stop", authenticateRequest, (req, res) => {
