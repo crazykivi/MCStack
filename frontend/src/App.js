@@ -29,10 +29,17 @@ function App() {
         const response = await fetch(
           "http://localhost:3001/auth/check-first-user"
         );
+        if (!response.ok) {
+          throw new Error("Ошибка при проверке первого пользователя.");
+        }
         const data = await response.json();
         setIsFirstUser(data.isFirstUser);
       } catch (error) {
-        console.error("Ошибка при проверке первого пользователя:", error);
+        console.error(
+          "Ошибка при проверке первого пользователя:",
+          error.message
+        );
+        setIsFirstUser(false);
       }
     };
 

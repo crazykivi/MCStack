@@ -2,8 +2,14 @@ require("dotenv").config();
 const { auth } = require("../utils/logger");
 const bcrypt = require("bcrypt");
 const { getUserByToken } = require("../utils/db");
+const config = require("../config/config.json");
 
 async function authenticateRequest(req, res, next) {
+  if (config.disableFrontendAuth) {
+    auth("Аутентификация отключена в конфиге.");
+    return next();
+  }
+
   const token = req.headers.authorization || req.body.token;
 
   if (!token) {

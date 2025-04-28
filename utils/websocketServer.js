@@ -11,6 +11,7 @@ const {
   getServerLogs,
 } = require("./resourceHistory");
 const { getUserByToken } = require("../utils/db");
+const config = require("../config/config.json");
 
 // Далее будет изменено, чтобы можно было выбирать, куда сохраняются логи
 const LOGS_DIR = path.join(__dirname, "../logs");
@@ -32,7 +33,6 @@ try {
   console.warn("Логи не найдены или повреждены. Создаем новый буфер.");
   terminalLogsBuffer = [];
 }
-
 
 const broadcastTerminalData = (message) => {
   const logEntry = {
@@ -68,37 +68,42 @@ captureTerminal(broadcastTerminalData);
 
 wss.on("connection", async (ws, req) => {
   webSocket("WebSocket client connected");
+  
+  if (config.disableFrontendAuth) {
+    webSocket("Аутентификация отключена в конфиге.");
+    ws.isAuthorized = true;
+  } else {
+    const token = new URLSearchParams(req.url.split("?")[1]).get("token");
 
-  const token = new URLSearchParams(req.url.split("?")[1]).get("token");
-
-  if (!token) {
-    ws.close();
-    return;
-  }
-
-  try {
-    const user = await getUserByToken(token);
-    if (!user) {
+    if (!token) {
       ws.close();
       return;
     }
 
-    ws.isAuthorized = true;
-    ws.userId = user.id;
-    webSocket(`Аутентификация WebSocket успешна для пользователя ID: ${user.id}`);
-  } catch (error) {
-    console.error("Ошибка при аутентификации WebSocket:", error.message);
-    ws.close();
+    try {
+      const user = await getUserByToken(token);
+      if (!user) {
+        ws.close();
+        return;
+      }
+
+      ws.isAuthorized = true;
+      ws.userId = user.id;
+      webSocket(
+        `Аутентификация WebSocket успешна для пользователя ID: ${user.id}`
+      );
+    } catch (error) {
+      console.error("Ошибка при аутентификации WebSocket:", error.message);
+      ws.close();
+      return;
+    }
   }
 
-  // 20 последних записей из терминала
   const last20Logs = terminalLogsBuffer.slice(-20);
   ws.send(JSON.stringify({ type: "terminal", data: last20Logs }));
 
-  // Использование ресурсов
   ws.send(JSON.stringify({ type: "resources", data: getHistory() }));
 
-  // Слушатель новых логов
   const broadcastLog = (log) => {
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {

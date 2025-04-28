@@ -11,7 +11,7 @@ services:
     volumes:
       - ./server:/app/server
       - ./data:/app/data
-      #- .:/app # Монтирование кода для разработки
+      # - .:/app # Монтирование кода (для разработки)
     env_file:
       - .env
     restart: always
