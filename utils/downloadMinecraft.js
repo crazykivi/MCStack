@@ -1,7 +1,7 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 
-const { getForgeVersion } = require("./forge/getForgeVersion.js");
+const { getForgeVersion } = require("./mods/getForgeVersion.js");
 const { debug, forge, fabric } = require("./logger")
 
 async function downloadFile(url, destination) {
