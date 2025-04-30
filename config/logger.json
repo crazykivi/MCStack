@@ -1,16 +1,17 @@
 {
-    "logging": {
-      "enabled": true,
-      "debug": false,
-      "java": true,
-      "commandOutup": true,
-      "commandError": true,
-      "commandSent": true,
-      "minecraftServer": true,
-      "vanilla": true,
-      "forge": true,
-      "fabric": true,
-      "webSocket": true,
-      "configLog": false
-    }
+  "logging": {
+    "enabled": true,
+    "debug": false,
+    "java": true,
+    "commandOutup": true,
+    "commandError": true,
+    "commandSent": true,
+    "minecraftServer": true,
+    "vanilla": true,
+    "forge": true,
+    "fabric": true,
+    "paper": true,
+    "webSocket": true,
+    "configLog": false
   }
+}

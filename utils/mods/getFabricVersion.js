@@ -1,32 +1,25 @@
 const axios = require("axios");
 const { debug, error } = require("../logger");
 
-async function getFabricVersion(minecraftVersion) {
-  const fabricMavenUrl = `https://maven.fabricmc.net/net/fabricmc/fabric-installer/maven-metadata.xml`;
+async function getPaperVersion(minecraftVersion) {
+  const apiUrl = `https://papermc.io/api/v2/projects/paper/versions/${minecraftVersion}/builds/latest`;
 
-  debug(`Запрос к Fabric Maven для версии ${minecraftVersion}: ${fabricMavenUrl}`);
-
+  debug(`Получение последней сборки Paper для версии ${minecraftVersion}`);
   try {
-    // Получение метаданных Maven
-    const { data: mavenMetadata } = await axios.get(fabricMavenUrl);
+    const response = await axios.get(apiUrl);
+    const latestBuild = response.data.build;
+    const fileName = `paper-${minecraftVersion}-${latestBuild}.jar`;
+    const downloadUrl = `https://papermc.io/api/v2/projects/paper/versions/${minecraftVersion}/builds/${latestBuild}/downloads/${fileName}`;
 
-    // Парсинг XML метаданных
-    const latestVersion = mavenMetadata.match(/<latest>(.*?)<\/latest>/)[1];
-    if (!latestVersion) {
-      throw new Error("Не удалось найти последнюю версию Fabric Installer.");
-    }
-
-    debug(`Найдена последняя версия Fabric Installer: ${latestVersion}`);
-
-    // Формирование URL для скачивания установщика
-    const installerUrl = `https://maven.fabricmc.net/net/fabricmc/fabric-installer/${latestVersion}/fabric-installer-${latestVersion}.jar`;
-    return { url: installerUrl, version: latestVersion };
+    return {
+      url: downloadUrl,
+      version: latestBuild.toString(),
+      fileName: fileName,
+    };
   } catch (err) {
-    error(`Ошибка при получении данных о версии Fabric: ${err.message}`);
-    throw new Error(
-      `Не удалось получить данные о версии Fabric для Minecraft ${minecraftVersion}.`
-    );
+    error(`Ошибка при получении данных о Paper: ${err.message}`);
+    throw new Error(`Не удалось получить данные о Paper для версии ${minecraftVersion}`);
   }
 }
 
-module.exports = { getFabricVersion };
+module.exports = { getPaperVersion };

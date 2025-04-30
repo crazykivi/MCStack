@@ -8,6 +8,7 @@ const authRoutes = require("./routes/auth");
 const {
   getVanillaServerUrl,
   getModsServerUrl,
+  getPluginsServerUrl,
   downloadFile,
 } = require("./utils/downloadMinecraft");
 const { downloadAndExtractJava } = require("./utils/downloadJava");
@@ -33,6 +34,7 @@ const {
   vanilla,
   forge,
   fabric,
+  paper,
 } = require("./utils/logger");
 const {
   getHistory,
@@ -175,6 +177,27 @@ async function startFabricServer(serverDir, version, core, javaPath) {
   }
 }
 
+async function startPaperServer(serverDir, version, core, javaPath) {
+  try {
+    const paperData = await getServerUrl("plugins", version, core);
+    const paperJarPath = path.join(serverDir, paperData.fileName);
+
+    if (!(await fs.pathExists(paperJarPath))) {
+      await downloadFile(paperData.url, paperJarPath);
+      paper(`Paper сервер успешно скачан: ${paperJarPath}`);
+    }
+
+    let config = getConfig();
+    const memoryOptions = `-Xmx${config.maxMemory} -Xms${config.minMemory}`;
+    const command = `${javaPath} ${memoryOptions} -jar ${paperData.fileName} nogui`;
+
+    startMinecraftServer(command, serverDir);
+  } catch (error) {
+    paper(`Ошибка при запуске Paper-сервера: ${error.message}`);
+    throw error;
+  }
+}
+
 async function executeCommand(command, cwd) {
   return new Promise((resolve, reject) => {
     const [executable, ...args] = command.split(" ");
@@ -210,7 +233,10 @@ async function getServerUrl(type, version, core) {
       }
       return getModsServerUrl(version, core);
     case "plugins":
-      throw new Error("Поддержка plugins пока не реализована.");
+      if (!core || !["paper"].includes(core)) {
+        throw new Error("Для типа 'plugins' необходимо указать ядро: paper.");
+      }
+      return getPluginsServerUrl(version, core);
     default:
       throw new Error(`Неизвестный тип сервера: ${type}`);
   }
@@ -267,6 +293,10 @@ async function startServer(type, version, core = null) {
         fabric: async () =>
           await startFabricServer(serverDir, version, core, javaPath),
       },
+      plugins: {
+        paper: async () =>
+          await startPaperServer(serverDir, version, core, javaPath),
+      },
     };
 
     // Проверка типа сервера
@@ -274,14 +304,34 @@ async function startServer(type, version, core = null) {
       throw new Error(`Неизвестный тип сервера: ${type}`);
     }
 
-    // Если mods, проверка поддерживаемого ядра
-    if (type === "mods" && !commandHandlers.mods[core]) {
-      throw new Error(`Неизвестное ядро для модов: ${core}`);
+    // // Если mods, проверка поддерживаемого ядра
+    // if (type === "mods" && !commandHandlers.mods[core]) {
+    //   throw new Error(`Неизвестное ядро для модов: ${core}`);
+    // }
+
+    // // Выбор и выполнение соответствующей команды
+    // const handler =
+    //   type === "mods" ? commandHandlers.mods[core] : commandHandlers[type];
+
+    let handler;
+
+    if (type === "mods") {
+      if (!commandHandlers.mods[core]) {
+        throw new Error(`Неизвестное ядро для модов: ${core}`);
+      }
+      handler = commandHandlers.mods[core];
+    } else if (type === "plugins") {
+      if (!commandHandlers.plugins || !commandHandlers.plugins[core]) {
+        throw new Error(`Неизвестное ядро для плагинов: ${core}`);
+      }
+      handler = commandHandlers.plugins[core];
+    } else {
+      handler = commandHandlers[type];
     }
 
-    // Выбор и выполнение соответствующей команды
-    const handler =
-      type === "mods" ? commandHandlers.mods[core] : commandHandlers[type];
+    if (typeof handler !== "function") {
+      throw new Error(`Handler для ${type} (${core}) не является функцией`);
+    }
     const result = await handler();
 
     startResourceMonitoring(getServerProcess, getPlayerCount, getMemoryUsage);

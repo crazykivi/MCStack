@@ -3,6 +3,7 @@ const fs = require("fs-extra");
 
 const { getForgeVersion } = require("./mods/getForgeVersion.js");
 const { getFabricVersion } = require("./mods/getFabricVersion.js");
+const { getPaperVersion } = require("./plugins/getPaperVersion");
 const { debug, forge, fabric } = require("./logger");
 
 async function downloadFile(url, destination) {
@@ -69,9 +70,25 @@ async function getModsServerUrl(version, core) {
   }
 }
 
-async function getPluginsServerUrl(version) {
-  const paperUrl = `https://papermc.io/api/v2/projects/paper/versions/${version}/builds/latest/downloads/paper-${version}-latest.jar`;
-  return paperUrl;
+async function getPluginsServerUrl(version, core) {
+  debug(
+    `Вызов getPluginsServerUrl с параметрами: version=${version}, core=${core}`
+  );
+
+  switch (core) {
+    case "paper":
+      const paperData = await getPaperVersion(version);
+      debug(`Формируемый URL (Paper): ${paperData.url}`);
+      return paperData;
+
+    default:
+      throw new Error(`Ядро "${core}" не поддерживается для типа plugins.`);
+  }
 }
 
-module.exports = { getVanillaServerUrl, getModsServerUrl, downloadFile };
+module.exports = {
+  getVanillaServerUrl,
+  getModsServerUrl,
+  getPluginsServerUrl,
+  downloadFile,
+};

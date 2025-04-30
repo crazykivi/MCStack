@@ -37,6 +37,9 @@ const ServerConsole = () => {
     if (serverType === "mods") {
       setCore("forge");
     }
+    if (serverType === "plugins") {
+      setCore("paper");
+    }
   }, [serverType]);
 
   // Подключение к WebSocket
@@ -432,6 +435,7 @@ const ServerConsole = () => {
             >
               <option value="vanilla">Vanilla</option>
               <option value="mods">Mods</option>
+              <option value="plugins">Plugins</option>
             </select>
             {serverType === "mods" && (
               <>
@@ -448,6 +452,23 @@ const ServerConsole = () => {
                   <option value="forge">Forge</option>
                   <option value="fabric">Fabric</option>
                   {/* Другие ядра позже будут */}
+                </select>
+              </>
+            )}
+
+            {serverType === "plugins" && (
+              <>
+                <label className="mr-2 text-gray-600">Ядро:</label>
+                <select
+                  value={core}
+                  onChange={(e) => {
+                    const selectedCore = e.target.value;
+                    console.log("Выбранное ядро:", selectedCore);
+                    setCore(selectedCore);
+                  }}
+                  className="border border-gray-300 rounded px-2 py-1"
+                >
+                  <option value="paper">Paper</option>
                 </select>
               </>
             )}
