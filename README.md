@@ -25,6 +25,7 @@
 * Vanilla
 * Forge (mods)
 * Fabric (mods)
+* Paper (plugins)
 
 ## **Установка**
 
