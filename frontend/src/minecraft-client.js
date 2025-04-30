@@ -256,7 +256,7 @@ const ServerConsole = () => {
       return;
     }
 
-    // Зарезервированные команды
+    // Зарезервированные команды, которые отправляются без command
     if (["save", "restart", "stop"].includes(command)) {
       fetch(`http://localhost:3001/${command}`, {
         method: "GET",
