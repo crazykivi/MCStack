@@ -1,17 +1,16 @@
 const WebSocket = require("ws");
 const fs = require("fs");
 const path = require("path");
-const { webSocket } = require("./logger");
+const { webSocket, configLog } = require("./logger");
 const captureTerminal = require("./terminalCapture");
 const {
   getHistory,
   addLogListener,
   removeLogListener,
-  addServerLog,
-  getServerLogs,
 } = require("./resourceHistory");
 const { getUserByToken } = require("../utils/db");
-const config = require("../config/config.json");
+// const config = require("../config/config.json");
+const { getConfig } = require("./configLoader");
 
 // Далее будет изменено, чтобы можно было выбирать, куда сохраняются логи
 const LOGS_DIR = path.join(__dirname, "../logs");
@@ -67,10 +66,10 @@ captureTerminal(broadcastTerminalData);
 // };
 
 wss.on("connection", async (ws, req) => {
-  webSocket("WebSocket client connected");
-  
+  const config = getConfig();
+
   if (config.disableFrontendAuth) {
-    webSocket("Аутентификация отключена в конфиге.");
+    configLog("Аутентификация отключена в конфиге.");
     ws.isAuthorized = true;
   } else {
     const token = new URLSearchParams(req.url.split("?")[1]).get("token");
@@ -99,6 +98,7 @@ wss.on("connection", async (ws, req) => {
     }
   }
 
+  webSocket("WebSocket client connected");
   const last20Logs = terminalLogsBuffer.slice(-20);
   ws.send(JSON.stringify({ type: "terminal", data: last20Logs }));
 

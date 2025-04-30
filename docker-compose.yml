@@ -11,6 +11,7 @@ services:
     volumes:
       - ./server:/app/server
       - ./data:/app/data
+      - ./config:/app/config
       # - .:/app # Монтирование кода (для разработки)
     env_file:
       - .env

@@ -22,7 +22,8 @@ const {
 const { getRequiredJavaVersion } = require("./utils/versionUtils");
 const { authenticateRequest } = require("./middleware/serverAuth");
 const { spawn } = require("child_process");
-const config = require("./config/config.json");
+// const config = require("./config/config.json");
+const { getConfig } = require("./utils/configLoader");
 const {
   minecraftServer,
   commandOutup,
@@ -44,6 +45,7 @@ const app = express();
 const PORT = 3001;
 
 function getDefaultParams(query) {
+  let config = getConfig();
   const type = query.type || config.defaultServerType;
   const version = query.version || config.defaultServerVersion;
   return { type, version };
@@ -73,6 +75,7 @@ async function prepareServerEnvironment(
 
   await acceptEULA(serverDir);
   const userJvmArgsPath = path.join(serverDir, "user_jvm_args.txt");
+  let config = getConfig();
   await fs.writeFile(
     userJvmArgsPath,
     `-Xmx${config.maxMemory} -Xms${config.minMemory}`
@@ -85,6 +88,7 @@ async function startVanillaServer(serverDir, version, core, javaPath) {
   await downloadFile(serverUrl, serverJarPath);
   vanilla("Сервер скачан:", serverJarPath);
 
+  let config = getConfig();
   const memoryOptions = `-Xmx${config.maxMemory} -Xms${config.minMemory}`;
   const command = `${javaPath} ${memoryOptions} -jar server.jar nogui`;
   startMinecraftServer(command, serverDir);
@@ -158,6 +162,7 @@ async function startFabricServer(serverDir, version, core, javaPath) {
       );
     }
 
+    let config = getConfig();
     // Формирование команды для запуска сервера
     const memoryOptions = `-Xmx${config.maxMemory} -Xms${config.minMemory}`;
     const command = `${javaPath} ${memoryOptions} -jar fabric-server-launch.jar nogui`;
@@ -242,6 +247,7 @@ async function startServer(type, version, core = null) {
 
     const javaPath = await downloadAndExtractJava(requiredJavaVersion);
 
+    let config = getConfig();
     const serverDir = path.join(
       __dirname,
       config.serverDirectory,
