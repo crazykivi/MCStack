@@ -509,14 +509,14 @@ const ServerConsole = () => {
           </p>
           <div className="flex justify-end mb-1">
             {/* Статус сервера и кол-во игроков */}
-            <div className="mr-4 text-gray-600">
+            {/* <div className="mr-4 text-gray-600">
               <span className="font-medium">Кол-во игроков на сервере:</span>
               {serverStatus === "stopped" ? (
                 <span className="ml-2 text-red-500">Сервер выключен</span>
               ) : (
                 <span className="ml-2 text-green-600">{`${playerCount} / ${maxPlayers}`}</span>
               )}
-            </div>
+            </div> */}
             <label className="mr-2 text-gray-600">Тип сервера:</label>
             <select
               value={serverType}
