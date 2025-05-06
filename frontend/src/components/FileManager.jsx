@@ -293,14 +293,13 @@ function FileListItem({ file, currentPath, refresh, token }) {
 function FileManager() {
   const [files, setFiles] = useState([]);
   const [newFolderName, setNewFolderName] = useState("");
-  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadFiles, setUploadFiles] = useState([]);
   const [folderSize, setFolderSize] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [showUploadInput, setShowUploadInput] = useState(false);
-  const [folderName, setFolderName] = useState("");
   const token = localStorage.getItem("token");
 
   const search = new URLSearchParams(window.location.search);
@@ -327,7 +326,7 @@ function FileManager() {
       setFiles([]);
       setFolderSize(0);
     } finally {
-      setIsLoading(false); // Скрываем индикатор загрузки
+      setIsLoading(false);
     }
   };
 
@@ -380,10 +379,32 @@ function FileManager() {
     );
   };
 
-  const goBack = () => {
-    const parts = currentPath.split("/").filter(Boolean);
-    parts.pop();
-    navigateTo(parts.join("/"));
+  const handleUpload = async () => {
+    if (!uploadFiles.length) return;
+
+    for (const file of uploadFiles) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("path", currentPath);
+
+      try {
+        await axios.post(
+          "http://localhost:3001/file-manager/upload",
+          formData,
+          {
+            headers: {
+              Authorization: token,
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+      } catch (err) {
+        alert(`Ошибка загрузки файла: ${file.name}`);
+      }
+    }
+
+    setUploadFiles([]);
+    fetchFiles();
   };
 
   const handleCreateFolder = async () => {
@@ -398,27 +419,6 @@ function FileManager() {
       fetchFiles();
     } catch (err) {
       alert("Ошибка при создании папки");
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!uploadFile) return;
-
-    const formData = new FormData();
-    formData.append("file", uploadFile);
-    formData.append("path", currentPath);
-
-    try {
-      await axios.post("http://localhost:3001/file-manager/upload", formData, {
-        headers: {
-          Authorization: token,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-      setUploadFile(null);
-      fetchFiles();
-    } catch (err) {
-      alert("Ошибка при загрузке файла");
     }
   };
 
@@ -527,8 +527,8 @@ function FileManager() {
                   <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-md z-50 p-3">
                     <input
                       type="text"
-                      value={folderName}
-                      onChange={(e) => setFolderName(e.target.value)}
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
                       placeholder="Имя папки"
                       className="border rounded px-2 py-1 w-full mb-2"
                     />
@@ -542,18 +542,62 @@ function FileManager() {
                 )}
                 {/* Поле загрузки файла */}
                 {showUploadInput && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-md z-50 p-3">
+                  <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-md z-50 p-3 w-64">
+                    {/* Зона перетаскивания */}
+                    <div
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const files = Array.from(e.dataTransfer.files);
+                        setUploadFiles(files);
+                      }}
+                      onDragOver={(e) => e.preventDefault()}
+                      className="border-2 border-dashed border-gray-400 rounded p-4 text-center mb-2 cursor-pointer hover:bg-gray-50 transition"
+                    >
+                      <p className="text-sm text-gray-600">
+                        Перетащите сюда файлы или папки
+                      </p>
+                    </div>
+
+                    {/* Инпут для выбора файлов */}
                     <input
                       type="file"
+                      multiple
+                      webkitdirectory
                       onChange={(e) => {
-                        setUploadFile(e.target.files[0]);
-                        handleUpload();
+                        const files = Array.from(e.target.files);
+                        setUploadFiles(files);
                       }}
-                      className="mb-2"
+                      className="mb-2 w-full"
                     />
+
+                    {/* Список загруженных файлов */}
+                    {uploadFiles.length > 0 && (
+                      <ul className="text-xs text-gray-600 max-h-32 overflow-y-auto mb-2">
+                        {uploadFiles.map((file, i) => (
+                          <li key={i} title={file.name}>
+                            • {file.name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {/* Кнопка загрузить */}
+                    <button
+                      onClick={handleUpload}
+                      disabled={!uploadFiles.length}
+                      className={`w-full px-3 py-1 rounded text-sm ${
+                        uploadFiles.length
+                          ? "bg-blue-500 text-white hover:bg-blue-600"
+                          : "bg-gray-300 cursor-not-allowed"
+                      }`}
+                    >
+                      Загрузить
+                    </button>
+
+                    {/* Отмена */}
                     <button
                       onClick={() => setShowUploadInput(false)}
-                      className="bg-gray-500 text-white px-3 py-1 rounded text-sm"
+                      className="w-full mt-1 bg-gray-500 text-white px-3 py-1 rounded text-sm"
                     >
                       Отмена
                     </button>

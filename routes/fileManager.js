@@ -5,6 +5,7 @@ const router = express.Router();
 const { authenticateRequest } = require("../middleware/serverAuth");
 const redisClient = require("../utils/redis");
 const { redis } = require("../utils/logger");
+const multer = require("multer");
 
 const SERVER_DIR = "/app/server";
 
@@ -132,16 +133,24 @@ router.get("/download", authenticateRequest, (req, res) => {
   res.download(filePath);
 });
 
+const upload = multer();
+
 // Загрузить файл
-router.post("/upload", authenticateRequest, async (req, res) => {
+router.post("/upload", authenticateRequest, upload.single("file"), async (req, res) => {
   const dir = path.resolve(SERVER_DIR, req.body.path);
   if (!dir.startsWith(SERVER_DIR)) return res.status(403).send("Запрещено");
 
-  const file = req.files?.file;
+  const file = req.file;
   if (!file) return res.status(400).send("Файл не найден");
 
-  await file.mv(path.join(dir, file.name));
-  res.send("Файл загружен");
+  const filePath = path.join(dir, file.originalname);
+
+  try {
+    await fs.writeFile(filePath, file.buffer);
+    res.send("Файл загружен");
+  } catch (err) {
+    res.status(500).send("Ошибка сохранения файла");
+  }
 });
 
  // Поиск файлов по имени (В будущем будет реализован поиск на фронт)

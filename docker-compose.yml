@@ -1,5 +1,6 @@
 version: "3"
 name: mcstack
+
 services:
   redis:
     image: redis:latest
@@ -7,6 +8,9 @@ services:
       - "6379:6379"
     networks:
       - minecraft-network
+    profiles:
+      - "local-redis"
+      - "all"
 
   api:
     build:
@@ -24,9 +28,8 @@ services:
     env_file:
       - .env
     environment:
-      REDIS_HOST: redis
-    depends_on:
-      - redis
+      DISABLE_REDIS: ${DISABLE_REDIS:-0}
+      REDIS_HOST: ${REDIS_HOST:-redis}
     restart: always
     command: >
       sh -c "if [ ! -d node_modules ]; then npm install; fi && node index.js"
@@ -50,6 +53,7 @@ services:
     restart: always
     profiles:
       - "frontend"
+      - "all"
     networks:
       - minecraft-network
 

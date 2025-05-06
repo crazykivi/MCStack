@@ -5,11 +5,16 @@ const { minecraftServer } = require("./logger");
 
 let serverProcess = null; // Глобальная переменная для хранения процесса сервера
 let currentPlayerCount = 0; // Переменная для хранения количества игроков
+let playerCountCallback = null;
 
 async function acceptEULA(serverDir) {
   const eulaPath = path.join(serverDir, "eula.txt");
   await fs.writeFile(eulaPath, "eula=true", "utf8");
   minecraftServer(`EULA принято: ${eulaPath}`);
+}
+
+function setPlayerCountCallback(callback) {
+  playerCountCallback = callback;
 }
 
 function startMinecraftServer(command, workingDir) {
@@ -19,7 +24,7 @@ function startMinecraftServer(command, workingDir) {
     stdio: ["pipe", "pipe", "pipe"],
   });
 
-  // Это условие проверки добавлено, чтобы не захламлять терминал не парит выводит команды, то можно удалить условие     
+  // Это условие проверки добавлено, чтобы не захламлять терминал не парит выводит команды, то можно удалить условие
   // if (!playerListRegex.test(output)) { minecraftServer(`${output}`); } и оставить просто вывод minecraftServer(`${output}`);
   const playerListRegex = /There are \d+ of a max of \d+ players online:/;
 
@@ -31,8 +36,17 @@ function startMinecraftServer(command, workingDir) {
     const playerCountMatch = output.match(
       /There are (\d+)\/\d+ players online:/
     );
+    // if (playerCountMatch) {
+    //   currentPlayerCount = parseInt(playerCountMatch[1], 10);
+    // }
     if (playerCountMatch) {
-      currentPlayerCount = parseInt(playerCountMatch[1], 10);
+      const newCount = parseInt(playerCountMatch[1], 10);
+      if (newCount !== currentPlayerCount) {
+        currentPlayerCount = newCount;
+        if (playerCountCallback) {
+          playerCountCallback(currentPlayerCount);
+        }
+      }
     }
     if (!playerListRegex.test(output)) {
       minecraftServer(`${output}`);
@@ -140,4 +154,5 @@ module.exports = {
   getServerProcess,
   getPlayerCount,
   getMemoryUsage,
+  setPlayerCountCallback,
 };

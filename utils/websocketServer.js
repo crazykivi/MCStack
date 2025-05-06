@@ -11,6 +11,7 @@ const {
 const { getUserByToken } = require("../utils/db");
 // const config = require("../config/config.json");
 const { getConfig } = require("./configLoader");
+const { setPlayerCountCallback } = require("./serverManager");
 
 // Далее будет изменено, чтобы можно было выбирать, куда сохраняются логи
 const LOGS_DIR = path.join(__dirname, "../logs");
@@ -101,8 +102,19 @@ wss.on("connection", async (ws, req) => {
   webSocket("WebSocket client connected");
   const last20Logs = terminalLogsBuffer.slice(-20);
   ws.send(JSON.stringify({ type: "terminal", data: last20Logs }));
-
+  const history = await getHistory();
+  const latestData = history.length > 0 ? history[history.length - 1] : {};
+  const playerCount = latestData.playerCount || "0/0";
+  ws.send(JSON.stringify({ type: "playerCount", data: playerCount }));
   ws.send(JSON.stringify({ type: "resources", data: getHistory() }));
+
+  const handlePlayerCountChange = (count) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "playerCount", data: count }));
+    }
+  };
+
+  setPlayerCountCallback(handlePlayerCountChange);
 
   const broadcastLog = (log) => {
     wss.clients.forEach((client) => {

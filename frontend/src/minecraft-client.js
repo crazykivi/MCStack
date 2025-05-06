@@ -19,8 +19,8 @@ const ServerConsole = () => {
   const [commandInput, setCommandInput] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [serverStatus, setServerStatus] = useState("loading"); // loading / running / stopped
-  const [playerCount, setPlayerCount] = useState(null);
-  const [maxPlayers, setMaxPlayers] = useState("20");
+  const [playerCount, setPlayerCount] = useState("0");
+  const [maxPlayers, setMaxPlayers] = useState("0");
 
   useEffect(() => {
     fetch("http://localhost:3001/frontend/minecraft-versions")
@@ -90,6 +90,15 @@ const ServerConsole = () => {
           // ) || [0, 20];
           // setPlayerCount(currentPlayers);
           // setMaxPlayers(totalPlayers);
+        }
+
+        if (type === "playerCount") {
+          const [currentPlayers, totalPlayers] = data.split("/") || [
+            "0",
+            "20",
+          ];
+          setPlayerCount(currentPlayers);
+          setMaxPlayers(totalPlayers);
         }
 
         if (type === "playerCount") {

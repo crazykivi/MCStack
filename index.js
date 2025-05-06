@@ -518,6 +518,7 @@ function sendCommandToServer(command) {
 
 app.use("/frontend", minecraftVersionsRouter);
 app.use("/auth", authRoutes);
+app.use(express.urlencoded({ extended: true }));
 app.use("/file-manager", fileManagerRouter);
 
 require("./utils/websocketServer");
