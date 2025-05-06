@@ -18,6 +18,9 @@ const ServerConsole = () => {
   const [core, setCore] = useState("");
   const [commandInput, setCommandInput] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [serverStatus, setServerStatus] = useState("loading"); // loading / running / stopped
+  const [playerCount, setPlayerCount] = useState(null);
+  const [maxPlayers, setMaxPlayers] = useState("20");
 
   useEffect(() => {
     fetch("http://localhost:3001/frontend/minecraft-versions")
@@ -63,13 +66,39 @@ const ServerConsole = () => {
       ws.onmessage = (event) => {
         setIsLoading(false);
         const { type, data } = JSON.parse(event.data);
+        // console.debug(data);
+        console.log("Полученные данные для графика:", data);
 
+        // if (type === "resources") {
+        //   const transformedData = transformDataForCharts(data);
+        //   setResourceHistory((prev) => {
+        //     const updatedHistory = [...prev, ...transformedData];
+        //     return updatedHistory.slice(-20);
+        //   });
+        // }
         if (type === "resources") {
           const transformedData = transformDataForCharts(data);
           setResourceHistory((prev) => {
             const updatedHistory = [...prev, ...transformedData];
             return updatedHistory.slice(-20);
           });
+
+          // setServerStatus(data.status || "stopped");
+
+          // const [currentPlayers, totalPlayers] = data.playerCount?.split(
+          //   "/"
+          // ) || [0, 20];
+          // setPlayerCount(currentPlayers);
+          // setMaxPlayers(totalPlayers);
+        }
+
+        if (type === "playerCount") {
+          setServerStatus(data.status || "stopped");
+          const [currentPlayers, totalPlayers] = data.playerCount?.split(
+            "/"
+          ) || [0, 20];
+          setPlayerCount(currentPlayers);
+          setMaxPlayers(totalPlayers);
         }
 
         if (type === "terminal") {
@@ -128,6 +157,23 @@ const ServerConsole = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const response = await fetch("http://localhost:3001/history");
+        if (!response.ok) throw new Error("Ошибка загрузки истории");
+
+        const history = await response.json();
+        const transformedHistory = transformDataForCharts(history);
+        setResourceHistory(transformedHistory);
+      } catch (error) {
+        console.error("Не удалось загрузить историю:", error);
+      }
+    };
+
+    loadHistory();
+  }, []);
+
   const formatBytes = (bytes) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -150,21 +196,47 @@ const ServerConsole = () => {
     return `${day}:${month}:${year} ${hours}:${minutes}:${seconds}`;
   };
 
+  // const transformDataForCharts = (data) => {
+  //   const dataArray = Array.isArray(data) ? data : [data];
+
+  //   const formattedData = dataArray.map((entry) => ({
+  //     timestamp: new Date(entry.timestamp),
+  //     displayTimestamp: formatDate(new Date(entry.timestamp)),
+  //     memoryUsage: entry.memoryUsage.heapUsed / (1024 * 1024),
+  //     cpuUsage: parseFloat(parseFloat(entry.cpuUsage).toFixed(3)),
+  //   }));
+
+  //   if (formattedData.length > 40) {
+  //     return averageDataByInterval(formattedData, 10);
+  //   }
+
+  //   return formattedData;
+  // };
+
   const transformDataForCharts = (data) => {
     const dataArray = Array.isArray(data) ? data : [data];
 
-    const formattedData = dataArray.map((entry) => ({
-      timestamp: new Date(entry.timestamp),
-      displayTimestamp: formatDate(new Date(entry.timestamp)),
-      memoryUsage: entry.memoryUsage.heapUsed / (1024 * 1024),
-      cpuUsage: parseFloat(parseFloat(entry.cpuUsage).toFixed(3)),
-    }));
-
-    if (formattedData.length > 40) {
-      return averageDataByInterval(formattedData, 10);
-    }
-
-    return formattedData;
+    return (
+      dataArray
+        // .filter((entry) => entry && typeof entry === "object") // Защита от null/undefined
+        .filter((entry) => {
+          return (
+            entry &&
+            typeof entry === "object" &&
+            entry.timestamp &&
+            entry.memoryUsage?.heapUsed > 0 &&
+            entry.cpuUsage !== "0.00" &&
+            !isNaN(new Date(entry.timestamp).getTime())
+          );
+        })
+        .map((entry) => ({
+          timestamp: new Date(entry.timestamp || Date.now()),
+          displayTimestamp: formatDate(new Date(entry.timestamp || Date.now())),
+          memoryUsage: (entry.memoryUsage?.heapUsed || 0) / (1024 * 1024), // MB
+          cpuUsage: parseFloat(parseFloat(entry.cpuUsage || 0).toFixed(3)),
+          playerCount: parseInt(entry.playerCount || 0),
+        }))
+    );
   };
 
   const averageDataByInterval = (data, intervalMinutes = 10) => {
@@ -376,9 +448,9 @@ const ServerConsole = () => {
           <div className="loader"></div>
         </div>
       )}
-      {/* <div className="w-64 bg-gray-200 p-4">
+      <div className="w-64 bg-gray-200 p-4">
         <ul>
-          <li className="py-2">
+          {/* <li className="py-2">
             <a href="#" className="text-blue-600">
               Настроить аккаунт
             </a>
@@ -397,29 +469,29 @@ const ServerConsole = () => {
             <a href="#" className="text-blue-600">
               Мои миры
             </a>
-          </li>
+          </li> */}
           <li className="py-2">
-            <a href="#" className="text-blue-600">
+            <a href="/dashboard" className="text-blue-600">
               Консоль
             </a>
           </li>
           <li className="py-2">
-            <a href="#" className="text-blue-600">
-              Файловы менеджер
+            <a href="/file-manager" className="text-blue-600">
+              Файловый менеджер
             </a>
           </li>
-          <li className="py-2">
+          {/* <li className="py-2">
             <a href="#" className="text-blue-600">
-            Управление задачами
+              Управление задачами
             </a>
           </li>
           <li className="py-2">
             <a href="#" className="text-blue-600">
               Конфигурация
             </a>
-          </li>
+          </li> */}
         </ul>
-      </div> */}
+      </div>
       <div className="flex-1 p-4">
         <div className="bg-white p-1 mb-4">
           <h2 className="text-lg font-bold mb-1">Управление сервером</h2>
@@ -427,6 +499,15 @@ const ServerConsole = () => {
             Панель для управления сервером в реальном времени
           </p>
           <div className="flex justify-end mb-1">
+            {/* Статус сервера и кол-во игроков */}
+            <div className="mr-4 text-gray-600">
+              <span className="font-medium">Кол-во игроков на сервере:</span>
+              {serverStatus === "stopped" ? (
+                <span className="ml-2 text-red-500">Сервер выключен</span>
+              ) : (
+                <span className="ml-2 text-green-600">{`${playerCount} / ${maxPlayers}`}</span>
+              )}
+            </div>
             <label className="mr-2 text-gray-600">Тип сервера:</label>
             <select
               value={serverType}
@@ -469,6 +550,7 @@ const ServerConsole = () => {
                   className="border border-gray-300 rounded px-2 py-1"
                 >
                   <option value="paper">Paper</option>
+                  <option value="spigot">Spigot</option>
                 </select>
               </>
             )}
@@ -568,9 +650,9 @@ const ServerConsole = () => {
             >
               Остановить
             </button>
-            {/* <button className="bg-red-800 hover:bg-red-900 text-white font-bold py-2 px-4 rounded mx-2">
+            <button className="bg-red-800 hover:bg-red-900 text-white font-bold py-2 px-4 rounded mx-2">
               Kill
-            </button> */}
+            </button>
           </div>
         </div>
         <div className="flex-1 flex justify-between">
@@ -583,10 +665,7 @@ const ServerConsole = () => {
               <Tooltip
                 formatter={(value, name) => {
                   if (name === "memoryUsage") {
-                    return [
-                      `${formatBytes(value * 1024 * 1024)}`,
-                      "Memory Usage",
-                    ];
+                    return [`${formatBytes(value * 1024 * 1024)}`, "ОЗУ"];
                   }
                   return [value, name];
                 }}

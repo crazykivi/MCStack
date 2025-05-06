@@ -11,7 +11,9 @@
     "forge": true,
     "fabric": true,
     "paper": true,
-    "webSocket": true,
-    "configLog": false
+    "spigot": true,
+    "webSocket": false,
+    "configLog": false,
+    "redis": true
   }
 }

@@ -35,6 +35,7 @@ const {
   forge,
   fabric,
   paper,
+  spigot,
 } = require("./utils/logger");
 const {
   getHistory,
@@ -42,6 +43,7 @@ const {
   stopResourceMonitoring,
 } = require("./utils/resourceHistory");
 const minecraftVersionsRouter = require("./utils/frontend/MinecraftVersions");
+const fileManagerRouter = require("./routes/fileManager");
 
 const app = express();
 const PORT = 3001;
@@ -198,6 +200,27 @@ async function startPaperServer(serverDir, version, core, javaPath) {
   }
 }
 
+async function startSpigotServer(serverDir, version, core, javaPath) {
+  try {
+    const spigotData = await getServerUrl("plugins", version, "spigot");
+    const spigotJarPath = path.join(serverDir, spigotData.fileName);
+
+    if (!(await fs.pathExists(spigotJarPath))) {
+      await downloadFile(spigotData.url, spigotJarPath);
+      spigot(`Spigot сервер успешно скачан: ${spigotJarPath}`);
+    }
+
+    let config = getConfig();
+    const memoryOptions = `-Xmx${config.maxMemory} -Xms${config.minMemory}`;
+    const command = `${javaPath} ${memoryOptions} -jar ${spigotData.fileName} nogui`;
+
+    startMinecraftServer(command, serverDir);
+  } catch (error) {
+    spigot(`Ошибка при запуске Spigot-сервера: ${error.message}`);
+    throw error;
+  }
+}
+
 async function executeCommand(command, cwd) {
   return new Promise((resolve, reject) => {
     const [executable, ...args] = command.split(" ");
@@ -233,7 +256,7 @@ async function getServerUrl(type, version, core) {
       }
       return getModsServerUrl(version, core);
     case "plugins":
-      if (!core || !["paper"].includes(core)) {
+      if (!core || !["paper", "spigot"].includes(core)) {
         throw new Error("Для типа 'plugins' необходимо указать ядро: paper.");
       }
       return getPluginsServerUrl(version, core);
@@ -248,9 +271,12 @@ app.get("/start", authenticateRequest, async (req, res) => {
 
   try {
     const serverProcess = getServerProcess();
+    // if (serverProcess && !serverProcess.killed) {
+    //   minecraftServer("Останавливаю предыдущий сервер...");
+    //   stopServer();
+    // }
     if (serverProcess && !serverProcess.killed) {
-      minecraftServer("Останавливаю предыдущий сервер...");
-      stopServer();
+      return res.send("Сервер уже запущен.");
     }
 
     await startServer(type, version, core);
@@ -296,6 +322,8 @@ async function startServer(type, version, core = null) {
       plugins: {
         paper: async () =>
           await startPaperServer(serverDir, version, core, javaPath),
+        spigot: async () =>
+          await startSpigotServer(serverDir, version, core, javaPath),
       },
     };
 
@@ -352,7 +380,7 @@ app.get("/stop", authenticateRequest, (req, res) => {
   if (stopped) {
     res.send("Команда stop отправлена.");
   } else {
-    res.status(400).send("[Minecraft Server]: Сервер не запущен.");
+    res.status(400).send("Сервер не запущен.");
   }
 });
 
@@ -373,7 +401,7 @@ app.get("/save", authenticateRequest, (req, res) => {
   if (saved) {
     res.send("Команда save-all отправлена.");
   } else {
-    res.status(400).send("[Minecraft Server]: Сервер не запущен.");
+    res.status(400).send("[Сервер не запущен.");
   }
 });
 
@@ -397,7 +425,7 @@ app.get("/restart", authenticateRequest, async (req, res) => {
   try {
     const stopped = stopServer();
     if (!stopped) {
-      return res.status(400).send("[Minecraft Server]: Сервер не запущен.");
+      return res.status(400).send("Сервер не запущен.");
     }
 
     await startServer(type, version, core);
@@ -429,8 +457,14 @@ app.get("/status", authenticateRequest, async (req, res) => {
   }
 });
 
-app.get("/history", authenticateRequest, (req, res) => {
-  res.json(getHistory());
+app.get("/history", authenticateRequest, async (req, res) => {
+  try {
+    const history = await getHistory();
+    res.json(history);
+  } catch (err) {
+    console.error("Ошибка при получении истории:", err);
+    res.status(500).json({ error: "Не удалось загрузить историю" });
+  }
 });
 
 app.post("/command", authenticateRequest, (req, res) => {
@@ -449,6 +483,28 @@ app.post("/command", authenticateRequest, (req, res) => {
   }
 });
 
+app.get("/server/status", authenticateRequest, async (req, res) => {
+  try {
+    const history = await getHistory();
+    const latestEntry = history[history.length - 1];
+
+    if (!latestEntry) {
+      return res.status(200).json({
+        status: "stopped",
+        playerCount: "0/20",
+      });
+    }
+
+    return res.status(200).json({
+      status: latestEntry.status,
+      playerCount: `${latestEntry.playerCount}/${latestEntry.maxPlayers || 20}`,
+    });
+  } catch (err) {
+    console.error("Ошибка при получении статуса сервера:", err);
+    return res.status(500).json({ status: "stopped", playerCount: "0/20" });
+  }
+});
+
 function sendCommandToServer(command) {
   const minecraftServerProcess = getServerProcess();
 
@@ -462,6 +518,7 @@ function sendCommandToServer(command) {
 
 app.use("/frontend", minecraftVersionsRouter);
 app.use("/auth", authRoutes);
+app.use("/file-manager", fileManagerRouter);
 
 require("./utils/websocketServer");
 

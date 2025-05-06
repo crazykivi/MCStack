@@ -1,14 +1,3 @@
-// import React from 'react';
-// import ServerConsole from './minecraft-client';
-
-// function App() {
-//   return (
-//     <div className="App">
-//       <ServerConsole /> {}
-//     </div>
-//   );
-// }
-
 import React, { useEffect, useState } from "react";
 import {
   BrowserRouter as Router,
@@ -19,6 +8,7 @@ import {
 import ServerConsole from "./minecraft-client";
 import Login from "./components/Login";
 import Register from "./components/Register";
+import FileManager from "./components/FileManager";
 
 function App() {
   const [isFirstUser, setIsFirstUser] = useState(null);
@@ -65,6 +55,10 @@ function App() {
           element={
             isAuthenticated ? <ServerConsole /> : <Navigate to="/login" />
           }
+        />
+        <Route
+          path="/file-manager"
+          element={isAuthenticated ? <FileManager /> : <Navigate to="/login" />}
         />
 
         {/* Перенаправление с корня */}

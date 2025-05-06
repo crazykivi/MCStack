@@ -27,6 +27,8 @@ function loadLoggerConfig() {
         paper: true,
         webSocket: true,
         configLog: true,
+        spigot: true,
+        redis: true,
       },
     };
   }
@@ -78,9 +80,11 @@ module.exports = {
   forge: createLogger("forge"),
   fabric: createLogger("fabric"),
   paper: createLogger("paper"),
+  spigot: createLogger("spigot"),
   debug: createLogger("debug"),
   error: createLogger("error"),
   auth: createLogger("auth"),
   webSocket: createLogger("webSocket"),
+  redis: createLogger("redis"),
   configLog: configLog,
 };

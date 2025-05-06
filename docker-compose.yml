@@ -1,5 +1,13 @@
-version: '3'
+version: "3"
+name: mcstack
 services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - minecraft-network
+
   api:
     build:
       context: .
@@ -15,9 +23,18 @@ services:
       # - .:/app # Монтирование кода (для разработки)
     env_file:
       - .env
+    environment:
+      REDIS_HOST: redis
+    depends_on:
+      - redis
     restart: always
     command: >
       sh -c "if [ ! -d node_modules ]; then npm install; fi && node index.js"
+    networks:
+      - minecraft-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   frontend:
     build:
@@ -33,3 +50,8 @@ services:
     restart: always
     profiles:
       - "frontend"
+    networks:
+      - minecraft-network
+
+networks:
+  minecraft-network:

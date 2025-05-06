@@ -1,5 +1,3 @@
-// terminalCapture.js
-
 const originalLog = console.log;
 
 function captureTerminal(broadcastFunction) {

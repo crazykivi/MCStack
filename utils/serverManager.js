@@ -19,9 +19,13 @@ function startMinecraftServer(command, workingDir) {
     stdio: ["pipe", "pipe", "pipe"],
   });
 
+  // Это условие проверки добавлено, чтобы не захламлять терминал не парит выводит команды, то можно удалить условие     
+  // if (!playerListRegex.test(output)) { minecraftServer(`${output}`); } и оставить просто вывод minecraftServer(`${output}`);
+  const playerListRegex = /There are \d+ of a max of \d+ players online:/;
+
   serverProcess.stdout.on("data", (data) => {
     const output = data.toString();
-    minecraftServer(`${output}`);
+    // minecraftServer(`${output}`);
 
     // Парсинг вывода для подсчета игроков
     const playerCountMatch = output.match(
@@ -29,6 +33,9 @@ function startMinecraftServer(command, workingDir) {
     );
     if (playerCountMatch) {
       currentPlayerCount = parseInt(playerCountMatch[1], 10);
+    }
+    if (!playerListRegex.test(output)) {
+      minecraftServer(`${output}`);
     }
   });
 

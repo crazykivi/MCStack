@@ -1,38 +1,49 @@
 const os = require("os");
+const redis = require("./redis");
 const {
   getServerProcess,
   getPlayerCount,
   getMemoryUsage,
 } = require("./serverManager");
 const { debug, commandError } = require("./logger");
-
-// Объект для хранения истории данных
-let resourceHistory = [];
 let monitoringInterval = null;
-let logListeners = []; // Массив колбэков для рассылки данных
 
-function addResourceData(data) {
+// Ключ в Redis для хранения истории ресурсов
+const HISTORY_KEY = "resource_history";
+// Массив колбэков для рассылки новых данных
+let logListeners = [];
+
+// Получение текущей истории из Redis
+async function getHistoryFromRedis() {
+  const cached = await redis.get(HISTORY_KEY);
+  return cached || [];
+}
+
+// Сохранение обновленную историю в redis
+async function saveHistoryToRedis(history) {
+  await redis.set(HISTORY_KEY, history, 86400); // TTL 24 часа
+}
+
+// Добавляем новую запись в историю
+async function addResourceData(data) {
   const timestamp = new Date().toISOString();
-  resourceHistory.push({ ...data, timestamp });
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  resourceHistory = resourceHistory.filter(
-    (entry) => new Date(entry.timestamp) > twentyFourHoursAgo
-  );
+  const entry = { ...data, timestamp };
 
-  notifyLogListeners(data);
+  let history = await getHistoryFromRedis();
+
+  history.push(entry);
+
+  // Удаляем записи старше 24 часов
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  history = history.filter((entry) => entry.timestamp > twentyFourHoursAgo);
+
+  await saveHistoryToRedis(history);
+  notifyLogListeners(entry);
 }
 
-function getHistory() {
-  return resourceHistory;
-}
-
-function addServerLog(log) {
-  const timestamp = new Date().toISOString();
-  serverLogs.push({ timestamp, log });
-}
-
-function getServerLogs(startIndex = 0, count = 50) {
-  return serverLogs.slice(startIndex, startIndex + count);
+// Возвращаем историю из Redis
+async function getHistory() {
+  return await getHistoryFromRedis();
 }
 
 function startResourceMonitoring(
@@ -59,14 +70,13 @@ function startResourceMonitoring(
       const memoryUsage = getMemoryUsage();
       const cpuLoad = os.loadavg()[0];
       const logEntry = {
-        timestamp: new Date(),
         status: isRunning ? "running" : "stopped",
         memoryUsage: memoryUsage,
         cpuUsage: cpuLoad.toFixed(2),
       };
 
-      //   addResourceData(logEntry);
-      addResourceData(logEntry);
+      await addResourceData(logEntry);
+
       if (onNewLog) {
         onNewLog(logEntry);
       }
@@ -111,6 +121,4 @@ module.exports = {
   stopResourceMonitoring,
   addLogListener,
   removeLogListener,
-  addServerLog,
-  getServerLogs,
 };
