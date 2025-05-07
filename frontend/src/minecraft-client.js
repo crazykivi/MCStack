@@ -92,14 +92,11 @@ const ServerConsole = () => {
           // setMaxPlayers(totalPlayers);
         }
 
-        if (type === "playerCount") {
-          const [currentPlayers, totalPlayers] = data.split("/") || [
-            "0",
-            "20",
-          ];
-          setPlayerCount(currentPlayers);
-          setMaxPlayers(totalPlayers);
-        }
+        // if (type === "playerCount") {
+        //   const [currentPlayers, totalPlayers] = data.split("/") || ["0", "20"];
+        //   setPlayerCount(currentPlayers);
+        //   setMaxPlayers(totalPlayers);
+        // }
 
         if (type === "playerCount") {
           setServerStatus(data.status || "stopped");
@@ -248,38 +245,38 @@ const ServerConsole = () => {
     );
   };
 
-  const averageDataByInterval = (data, intervalMinutes = 10) => {
-    const groupedData = {};
+  // const averageDataByInterval = (data, intervalMinutes = 10) => {
+  //   const groupedData = {};
 
-    data.forEach((entry) => {
-      const date = new Date(entry.timestamp);
-      const intervalStart = new Date(
-        Math.floor(date.getTime() / (intervalMinutes * 60 * 1000)) *
-          (intervalMinutes * 60 * 1000)
-      );
+  //   data.forEach((entry) => {
+  //     const date = new Date(entry.timestamp);
+  //     const intervalStart = new Date(
+  //       Math.floor(date.getTime() / (intervalMinutes * 60 * 1000)) *
+  //         (intervalMinutes * 60 * 1000)
+  //     );
 
-      const intervalKey = intervalStart.toISOString();
+  //     const intervalKey = intervalStart.toISOString();
 
-      if (!groupedData[intervalKey]) {
-        groupedData[intervalKey] = {
-          timestamp: intervalStart,
-          memoryUsageSum: 0,
-          cpuUsageSum: 0,
-          count: 0,
-        };
-      }
+  //     if (!groupedData[intervalKey]) {
+  //       groupedData[intervalKey] = {
+  //         timestamp: intervalStart,
+  //         memoryUsageSum: 0,
+  //         cpuUsageSum: 0,
+  //         count: 0,
+  //       };
+  //     }
 
-      groupedData[intervalKey].memoryUsageSum += entry.memoryUsage;
-      groupedData[intervalKey].cpuUsageSum += entry.cpuUsage;
-      groupedData[intervalKey].count += 1;
-    });
+  //     groupedData[intervalKey].memoryUsageSum += entry.memoryUsage;
+  //     groupedData[intervalKey].cpuUsageSum += entry.cpuUsage;
+  //     groupedData[intervalKey].count += 1;
+  //   });
 
-    return Object.values(groupedData).map((group) => ({
-      timestamp: group.timestamp,
-      memoryUsage: parseFloat((group.memoryUsageSum / group.count).toFixed(3)),
-      cpuUsage: parseFloat((group.cpuUsageSum / group.count).toFixed(3)),
-    }));
-  };
+  //   return Object.values(groupedData).map((group) => ({
+  //     timestamp: group.timestamp,
+  //     memoryUsage: parseFloat((group.memoryUsageSum / group.count).toFixed(3)),
+  //     cpuUsage: parseFloat((group.cpuUsageSum / group.count).toFixed(3)),
+  //   }));
+  // };
 
   const handleStart = () => {
     const currentCore = core;
@@ -669,9 +666,19 @@ const ServerConsole = () => {
             <h2 className="text-lg font-bold mb-2">Memory Usage</h2>
             <LineChart width={400} height={200} data={resourceHistory}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="timestamp" />
+
+              {/* Ось X с красивым форматом даты */}
+              <XAxis
+                dataKey="timestamp"
+                tickFormatter={(unixTime) => formatDate(new Date(unixTime))}
+                interval="preserveStartEnd"
+              />
+
               <YAxis />
+
+              {/* Tooltip с форматированием памяти */}
               <Tooltip
+                labelFormatter={(label) => formatDate(new Date(label))}
                 formatter={(value, name) => {
                   if (name === "memoryUsage") {
                     return [`${formatBytes(value * 1024 * 1024)}`, "ОЗУ"];
@@ -679,6 +686,7 @@ const ServerConsole = () => {
                   return [value, name];
                 }}
               />
+
               <Legend />
               <Line
                 type="monotone"
@@ -692,9 +700,19 @@ const ServerConsole = () => {
             <h2 className="text-lg font-bold mb-2">CPU Usage</h2>
             <LineChart width={400} height={200} data={resourceHistory}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="timestamp" />
+
+              <XAxis
+                dataKey="timestamp"
+                tickFormatter={(unixTime) => formatDate(new Date(unixTime))}
+                interval="preserveStartEnd"
+              />
+
               <YAxis />
-              <Tooltip />
+
+              <Tooltip
+                labelFormatter={(label) => formatDate(new Date(label))}
+              />
+
               <Legend />
               <Line
                 type="monotone"
