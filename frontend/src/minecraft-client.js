@@ -49,6 +49,32 @@ const ServerConsole = () => {
     fetchConfig();
   }, []);
 
+  const apiRequest = async (url, options = {}) => {
+    const token = localStorage.getItem("token");
+
+    if (!disableFrontendAuth && !token) {
+      console.error("Токен не найден. Пожалуйста, войдите в систему.");
+      return Promise.reject(new Error("Токен не найден"));
+    }
+
+    const headers = {
+      ...(options.headers || {}),
+      Authorization: token,
+    };
+
+    try {
+      const response = await fetch(url, { ...options, headers });
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      const text = await response.text();
+      return text;
+    } catch (error) {
+      console.error("Ошибка API:", error.message);
+      throw error;
+    }
+  };
+
   const handleVersionChange = (event) => {
     setSelectedVersion(event.target.value);
   };
@@ -73,7 +99,6 @@ const ServerConsole = () => {
       if (!disableFrontendAuth) {
         const token = localStorage.getItem("token");
         if (!token) {
-          console.error("Токен не найден. Пожалуйста, войдите в систему.");
           return;
         }
         wsUrl += `?token=${token}`;
@@ -162,7 +187,23 @@ const ServerConsole = () => {
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        const response = await fetch("http://localhost:3001/history");
+        if (disableFrontendAuth === null) {
+          console.warn("Конфиг ещё не загружен. Ждём...");
+          return;
+        }
+
+        const token = localStorage.getItem("token");
+
+        if (!disableFrontendAuth && !token) {
+          return;
+        }
+
+        const response = await fetch("http://localhost:3001/history", {
+          headers: {
+            Authorization: token,
+          },
+        });
+
         if (!response.ok) throw new Error("Ошибка загрузки истории");
 
         const history = await response.json();
@@ -174,7 +215,7 @@ const ServerConsole = () => {
     };
 
     loadHistory();
-  }, []);
+  }, [disableFrontendAuth]);
 
   const formatBytes = (bytes) => {
     if (bytes === 0) return "0 Bytes";
@@ -276,7 +317,7 @@ const ServerConsole = () => {
 
   const handleStart = () => {
     const currentCore = core;
-    console.log(currentCore);
+
     if (serverType === "mods" && !currentCore) {
       alert("Для типа 'mods' необходимо выбрать ядро (Forge).");
       return;
@@ -287,26 +328,10 @@ const ServerConsole = () => {
       version: selectedVersion,
       core: currentCore,
     }).toString();
-    console.log(queryParams);
-    const token = localStorage.getItem("token");
 
-    if (!token) {
-      console.error("Токен не найден. Пожалуйста, войдите в систему.");
-      return;
-    }
+    const url = `http://localhost:3001/start?${queryParams}`;
 
-    fetch(`http://localhost:3001/start?${queryParams}`, {
-      method: "GET",
-      headers: {
-        Authorization: token,
-      },
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.text();
-      })
+    apiRequest(url)
       .then((data) => {
         console.debug("Сервер запущен:", data);
       })
@@ -323,27 +348,9 @@ const ServerConsole = () => {
 
     const command = commandInput.trim();
 
-    const token = localStorage.getItem("token");
-
-    if (!token) {
-      console.error("Токен не найден. Пожалуйста, войдите в систему.");
-      return;
-    }
-
-    // Зарезервированные команды, которые отправляются без command
     if (["save", "restart", "stop"].includes(command)) {
-      fetch(`http://localhost:3001/${command}`, {
-        method: "GET",
-        headers: {
-          Authorization: token,
-        },
-      })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-          return response.text();
-        })
+      const url = `http://localhost:3001/${command}`;
+      apiRequest(url)
         .then((data) => {
           console.log(`Команда "${command}" выполнена:`, data);
         })
@@ -351,21 +358,13 @@ const ServerConsole = () => {
           console.error(`Ошибка при выполнении команды "${command}":`, error);
         });
     } else {
-      // Отправка произвольной команды
-      fetch("http://localhost:3001/command", {
+      apiRequest("http://localhost:3001/command", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: token,
         },
         body: JSON.stringify({ command }),
       })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-          return response.text();
-        })
         .then((data) => {
           console.log(`Команда "${command}" выполнена:`, data);
         })
@@ -384,58 +383,26 @@ const ServerConsole = () => {
       ...(serverType === "mods" && { core }),
     }).toString();
 
-    const token = localStorage.getItem("token");
+    const url = `http://localhost:3001/restart?${queryParams}`;
 
-    if (!token) {
-      console.error("Токен не найден. Пожалуйста, войдите в систему.");
-      return;
-    }
-
-    fetch(`http://localhost:3001/restart?${queryParams}`, {
-      method: "GET",
-      headers: {
-        Authorization: token,
-      },
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.text();
-      })
+    apiRequest(url)
       .then((data) => {
         console.debug("Сервер перезапущен:", data);
       })
       .catch((error) => {
-        console.error("Ошибка при запуске сервера:", error);
+        console.error("Ошибка при перезапуске сервера:", error);
       });
   };
 
   const handleStop = () => {
-    const token = localStorage.getItem("token");
+    const url = "http://localhost:3001/stop";
 
-    if (!token) {
-      console.error("Токен не найден. Пожалуйста, войдите в систему.");
-      return;
-    }
-
-    fetch(`http://localhost:3001/stop`, {
-      method: "GET",
-      headers: {
-        Authorization: token,
-      },
-    })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.text();
-      })
+    apiRequest(url)
       .then((data) => {
         console.debug("Сервер остановлен:", data);
       })
       .catch((error) => {
-        console.error("Ошибка при запуске сервера:", error);
+        console.error("Ошибка при остановке сервера:", error);
       });
   };
 
