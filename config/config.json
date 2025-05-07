@@ -10,5 +10,5 @@
     "minMemory": "1G",
     "defaultServerType": "vanilla",
     "defaultServerVersion": "1.21.5",
-    "disableFrontendAuth": true
+    "disableFrontendAuth": false
 }

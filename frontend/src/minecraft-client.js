@@ -22,6 +22,8 @@ const ServerConsole = () => {
   const [playerCount, setPlayerCount] = useState("0");
   const [maxPlayers, setMaxPlayers] = useState("0");
 
+  const [disableFrontendAuth, setDisableFrontendAuth] = useState(false);
+
   useEffect(() => {
     fetch("http://localhost:3001/frontend/minecraft-versions")
       .then((response) => response.json())
@@ -30,6 +32,21 @@ const ServerConsole = () => {
         setSelectedVersion(versions[0]);
       })
       .catch((error) => console.error("Ошибка при загрузке версий:", error));
+  }, []);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const configRes = await fetch("http://localhost:3001/config");
+        const configData = await configRes.json();
+        setDisableFrontendAuth(configData.disableFrontendAuth || false);
+      } catch (err) {
+        console.error("Не удалось получить конфиг:", err.message);
+        setDisableFrontendAuth(false);
+      }
+    };
+
+    fetchConfig();
   }, []);
 
   const handleVersionChange = (event) => {
@@ -47,121 +64,100 @@ const ServerConsole = () => {
 
   // Подключение к WebSocket
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      console.error("Токен не найден. Пожалуйста, войдите в систему.");
-      return;
-    }
+    if (disableFrontendAuth === null) return; // Ждём, пока будет загружен конфиг
 
-    let ws;
-    setIsLoading(true);
+    const connectWebSocket = async () => {
+      let wsUrl = "ws://localhost:3002/logs";
 
-    const timeoutId = setTimeout(() => {
-      ws = new WebSocket(`ws://localhost:3002/logs?token=${token}`);
-
-      ws.onopen = () => {
-        console.log("WebSocket connection established");
-      };
-
-      ws.onmessage = (event) => {
-        setIsLoading(false);
-        const { type, data } = JSON.parse(event.data);
-        // console.debug(data);
-        console.log("Полученные данные для графика:", data);
-
-        // if (type === "resources") {
-        //   const transformedData = transformDataForCharts(data);
-        //   setResourceHistory((prev) => {
-        //     const updatedHistory = [...prev, ...transformedData];
-        //     return updatedHistory.slice(-20);
-        //   });
-        // }
-        if (type === "resources") {
-          const transformedData = transformDataForCharts(data);
-          setResourceHistory((prev) => {
-            const updatedHistory = [...prev, ...transformedData];
-            return updatedHistory.slice(-20);
-          });
-
-          // setServerStatus(data.status || "stopped");
-
-          // const [currentPlayers, totalPlayers] = data.playerCount?.split(
-          //   "/"
-          // ) || [0, 20];
-          // setPlayerCount(currentPlayers);
-          // setMaxPlayers(totalPlayers);
+      // Добавляем токен, если нужен
+      if (!disableFrontendAuth) {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          console.error("Токен не найден. Пожалуйста, войдите в систему.");
+          return;
         }
+        wsUrl += `?token=${token}`;
+      }
 
-        // if (type === "playerCount") {
-        //   const [currentPlayers, totalPlayers] = data.split("/") || ["0", "20"];
-        //   setPlayerCount(currentPlayers);
-        //   setMaxPlayers(totalPlayers);
-        // }
+      let ws;
+      setIsLoading(true);
 
-        if (type === "playerCount") {
-          setServerStatus(data.status || "stopped");
-          const [currentPlayers, totalPlayers] = data.playerCount?.split(
-            "/"
-          ) || [0, 20];
-          setPlayerCount(currentPlayers);
-          setMaxPlayers(totalPlayers);
-        }
+      const timeoutId = setTimeout(() => {
+        ws = new WebSocket(wsUrl);
 
-        if (type === "terminal") {
-          let parsedData;
+        ws.onopen = () => {
+          console.log("WebSocket connection established");
+        };
 
-          if (Array.isArray(data)) {
-            parsedData = data.map((item) => ({
-              timestamp: item.timestamp || new Date().toISOString(),
-              message: (item.message || "").trim() || "No message",
-            }));
-          } else if (typeof data === "string") {
-            const match = data.match(/\[(.*?)\]\s*(.*)/);
-            if (match) {
-              parsedData = {
-                timestamp: match[1],
-                message: match[2],
-              };
-            } else {
-              parsedData = {
-                timestamp: new Date().toISOString(),
-                message: data,
-              };
-            }
-          } else {
-            parsedData = {
-              timestamp: data.timestamp || new Date().toISOString(),
-              message: (data.message || "").trim() || "No message",
-            };
+        ws.onmessage = (event) => {
+          setIsLoading(false);
+          const { type, data } = JSON.parse(event.data);
+
+          if (type === "resources") {
+            const transformedData = transformDataForCharts(data);
+            setResourceHistory((prev) => {
+              const updatedHistory = [...prev, ...transformedData];
+              return updatedHistory.slice(-20);
+            });
           }
 
-          setConsoleOutput((prev) => {
-            const updatedOutput = Array.isArray(parsedData)
-              ? [...prev, ...parsedData]
-              : [...prev, parsedData];
-            return updatedOutput.slice(-50);
-          });
-        }
-      };
+          if (type === "playerCount") {
+            setServerStatus(data.status || "stopped");
+            const [currentPlayers, totalPlayers] = data.playerCount?.split(
+              "/"
+            ) || [0, 20];
+            setPlayerCount(currentPlayers);
+            setMaxPlayers(totalPlayers);
+          }
 
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        setIsLoading(false);
-      };
+          if (type === "terminal") {
+            let parsedData;
 
-      ws.onclose = () => {
-        console.log("WebSocket connection closed");
-        setIsLoading(false);
-      };
-    }, 1000);
+            if (Array.isArray(data)) {
+              parsedData = data.map((item) => ({
+                timestamp: item.timestamp || new Date().toISOString(),
+                message: (item.message || "").trim() || "No message",
+              }));
+            } else if (typeof data === "string") {
+              const match = data.match(/\[(.*?)\]\s*(.*)/);
+              parsedData = match
+                ? { timestamp: match[1], message: match[2] }
+                : { timestamp: new Date().toISOString(), message: data };
+            } else {
+              parsedData = {
+                timestamp: data.timestamp || new Date().toISOString(),
+                message: (data.message || "").trim() || "No message",
+              };
+            }
 
-    return () => {
-      clearTimeout(timeoutId);
-      if (ws) {
-        ws.close();
-      }
+            setConsoleOutput((prev) => {
+              const updatedOutput = Array.isArray(parsedData)
+                ? [...prev, ...parsedData]
+                : [...prev, parsedData];
+              return updatedOutput.slice(-50);
+            });
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error("WebSocket error:", error);
+          setIsLoading(false);
+        };
+
+        ws.onclose = () => {
+          console.log("WebSocket connection closed");
+          setIsLoading(false);
+        };
+      }, 1000);
+
+      return () => {
+        clearTimeout(timeoutId);
+        if (ws) ws.close();
+      };
     };
-  }, []);
+
+    connectWebSocket();
+  }, [disableFrontendAuth]);
 
   useEffect(() => {
     const loadHistory = async () => {

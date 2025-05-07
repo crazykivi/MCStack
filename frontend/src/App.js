@@ -12,36 +12,54 @@ import FileManager from "./components/FileManager";
 
 function App() {
   const [isFirstUser, setIsFirstUser] = useState(null);
-
-  useEffect(() => {
-    const checkFirstUser = async () => {
-      try {
-        const response = await fetch(
-          "http://localhost:3001/auth/check-first-user"
-        );
-        if (!response.ok) {
-          throw new Error("Ошибка при проверке первого пользователя.");
-        }
-        const data = await response.json();
-        setIsFirstUser(data.isFirstUser);
-      } catch (error) {
-        console.error(
-          "Ошибка при проверке первого пользователя:",
-          error.message
-        );
-        setIsFirstUser(false);
-      }
-    };
-
-    checkFirstUser();
-  }, []);
+  const [disableFrontendAuth, setDisableFrontendAuth] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const isAuthenticated = !!localStorage.getItem("token");
 
-  if (isFirstUser === null) {
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Запрос на проверку, есть ли авторизация или нет
+        const configRes = await fetch("http://localhost:3001/config");
+        const configData = await configRes.json();
+        setDisableFrontendAuth(configData.disableFrontendAuth || false);
+
+        // Проверка первого пользователя
+        const userRes = await fetch("http://localhost:3001/auth/check-first-user");
+        const userData = await userRes.json();
+        setIsFirstUser(userData.isFirstUser);
+      } catch (error) {
+        console.error("Ошибка инициализации:", error.message);
+        setIsFirstUser(false);
+        setDisableFrontendAuth(false); // По умолчанию авторизация включена
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (isLoading) {
     return <div>Загрузка...</div>;
   }
 
+  // Если авторизация отключена — панель доступна без аутентификации
+  if (disableFrontendAuth) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<ServerConsole />} />
+          <Route path="/file-manager" element={<FileManager />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </Router>
+    );
+  }
+
+  // Стандартная логика с авторизацией
   return (
     <Router>
       <Routes>
@@ -52,9 +70,7 @@ function App() {
         {/* Защищенные маршруты */}
         <Route
           path="/dashboard"
-          element={
-            isAuthenticated ? <ServerConsole /> : <Navigate to="/login" />
-          }
+          element={isAuthenticated ? <ServerConsole /> : <Navigate to="/login" />}
         />
         <Route
           path="/file-manager"
@@ -74,6 +90,9 @@ function App() {
             )
           }
         />
+
+        {/* 404 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

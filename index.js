@@ -505,6 +505,17 @@ app.get("/server/status", authenticateRequest, async (req, res) => {
   }
 });
 
+app.get("/config", async (req, res) => {
+  try {
+    const config = getConfig();
+    res.json({
+      disableFrontendAuth: config.disableFrontendAuth,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Не удалось получить конфиг" });
+  }
+});
+
 function sendCommandToServer(command) {
   const minecraftServerProcess = getServerProcess();
 
