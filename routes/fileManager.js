@@ -9,9 +9,13 @@ const multer = require("multer");
 
 const SERVER_DIR = "/app/server";
 
+// function normalizePath(input) {
+//   if (!input) return "";
+//   return input.split("/").filter(Boolean).join("/");
+// }
 function normalizePath(input) {
   if (!input) return "";
-  return input.split("/").filter(Boolean).join("/");
+  return input.replace(/\\/g, "/").split("/").filter(Boolean).join("/");
 }
 
 async function getFolderSize(folderPath) {
@@ -136,24 +140,29 @@ router.get("/download", authenticateRequest, (req, res) => {
 const upload = multer();
 
 // Загрузить файл
-router.post("/upload", authenticateRequest, upload.single("file"), async (req, res) => {
-  const dir = path.resolve(SERVER_DIR, req.body.path);
-  if (!dir.startsWith(SERVER_DIR)) return res.status(403).send("Запрещено");
+router.post(
+  "/upload",
+  authenticateRequest,
+  upload.single("file"),
+  async (req, res) => {
+    const dir = path.resolve(SERVER_DIR, req.body.path);
+    if (!dir.startsWith(SERVER_DIR)) return res.status(403).send("Запрещено");
 
-  const file = req.file;
-  if (!file) return res.status(400).send("Файл не найден");
+    const file = req.file;
+    if (!file) return res.status(400).send("Файл не найден");
 
-  const filePath = path.join(dir, file.originalname);
+    const filePath = path.join(dir, file.originalname);
 
-  try {
-    await fs.writeFile(filePath, file.buffer);
-    res.send("Файл загружен");
-  } catch (err) {
-    res.status(500).send("Ошибка сохранения файла");
+    try {
+      await fs.writeFile(filePath, file.buffer);
+      res.send("Файл загружен");
+    } catch (err) {
+      res.status(500).send("Ошибка сохранения файла");
+    }
   }
-});
+);
 
- // Поиск файлов по имени (В будущем будет реализован поиск на фронт)
+// Поиск файлов по имени (В будущем будет реализован поиск на фронт)
 // router.get("/search", authenticateRequest, async (req, res) => {
 //   const relativePath = normalizePath(req.query.path);
 //   const fullPath = path.join(SERVER_DIR, relativePath);

@@ -9,6 +9,7 @@ import ServerConsole from "./minecraft-client";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import FileManager from "./components/FileManager";
+import { API_URL } from "./utils/apiConfig";
 
 function App() {
   const [isFirstUser, setIsFirstUser] = useState(null);
@@ -21,12 +22,12 @@ function App() {
     const fetchData = async () => {
       try {
         // Запрос на проверку, есть ли авторизация или нет
-        const configRes = await fetch("http://localhost:3001/config");
+        const configRes = await fetch(`${API_URL}/config`);
         const configData = await configRes.json();
         setDisableFrontendAuth(configData.disableFrontendAuth || false);
 
         // Проверка первого пользователя
-        const userRes = await fetch("http://localhost:3001/auth/check-first-user");
+        const userRes = await fetch(`${API_URL}/auth/check-first-user`);
         const userData = await userRes.json();
         setIsFirstUser(userData.isFirstUser);
       } catch (error) {

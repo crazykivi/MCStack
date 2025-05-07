@@ -8,6 +8,7 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
+import { API_URL, WS_URL } from "./utils/apiConfig";
 
 const ServerConsole = () => {
   const [consoleOutput, setConsoleOutput] = useState([]);
@@ -25,7 +26,7 @@ const ServerConsole = () => {
   const [disableFrontendAuth, setDisableFrontendAuth] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:3001/frontend/minecraft-versions")
+    fetch(`${API_URL}/frontend/minecraft-versions`)
       .then((response) => response.json())
       .then((versions) => {
         setMinecraftVersions(versions);
@@ -37,7 +38,7 @@ const ServerConsole = () => {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const configRes = await fetch("http://localhost:3001/config");
+        const configRes = await fetch(`${API_URL}/config`);
         const configData = await configRes.json();
         setDisableFrontendAuth(configData.disableFrontendAuth || false);
       } catch (err) {
@@ -93,7 +94,7 @@ const ServerConsole = () => {
     if (disableFrontendAuth === null) return; // Ждём, пока будет загружен конфиг
 
     const connectWebSocket = async () => {
-      let wsUrl = "ws://localhost:3002/logs";
+      let wsUrl = WS_URL;
 
       // Добавляем токен, если нужен
       if (!disableFrontendAuth) {
@@ -198,7 +199,7 @@ const ServerConsole = () => {
           return;
         }
 
-        const response = await fetch("http://localhost:3001/history", {
+        const response = await fetch(`${API_URL}/history`, {
           headers: {
             Authorization: token,
           },
@@ -329,7 +330,7 @@ const ServerConsole = () => {
       core: currentCore,
     }).toString();
 
-    const url = `http://localhost:3001/start?${queryParams}`;
+    const url = `${API_URL}/start?${queryParams}`;
 
     apiRequest(url)
       .then((data) => {
@@ -349,7 +350,7 @@ const ServerConsole = () => {
     const command = commandInput.trim();
 
     if (["save", "restart", "stop"].includes(command)) {
-      const url = `http://localhost:3001/${command}`;
+      const url = `${API_URL}/${command}`;
       apiRequest(url)
         .then((data) => {
           console.log(`Команда "${command}" выполнена:`, data);
@@ -358,7 +359,7 @@ const ServerConsole = () => {
           console.error(`Ошибка при выполнении команды "${command}":`, error);
         });
     } else {
-      apiRequest("http://localhost:3001/command", {
+      apiRequest(`${API_URL}/command`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -383,7 +384,7 @@ const ServerConsole = () => {
       ...(serverType === "mods" && { core }),
     }).toString();
 
-    const url = `http://localhost:3001/restart?${queryParams}`;
+    const url = `${API_URL}/restart?${queryParams}`;
 
     apiRequest(url)
       .then((data) => {
@@ -395,7 +396,7 @@ const ServerConsole = () => {
   };
 
   const handleStop = () => {
-    const url = "http://localhost:3001/stop";
+    const url = `${API_URL}/stop`;
 
     apiRequest(url)
       .then((data) => {
@@ -644,7 +645,7 @@ const ServerConsole = () => {
                 labelFormatter={(label) => formatDate(new Date(label))}
                 formatter={(value, name) => {
                   if (name === "memoryUsage") {
-                    return [`${formatBytes(value * 1024 * 1024)}`, "ОЗУ"];
+                    return [`${formatBytes(value * 1024 * 1024)}`, "memoryUsage"];
                   }
                   return [value, name];
                 }}

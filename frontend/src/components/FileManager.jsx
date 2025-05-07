@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { API_URL } from "../utils/apiConfig";
 
 function FileIcon({ type }) {
   let icon = null;
@@ -235,7 +236,7 @@ function FileListItem({ file, currentPath, refresh, token }) {
     if (!window.confirm(`Удалить "${file.name}"?`)) return;
     setIsDeleting(true);
     try {
-      await axios.delete("http://localhost:3001/file-manager/delete", {
+      await axios.delete(`${API_URL}/file-manager/delete`, {
         headers: { Authorization: token },
         data: { path: `${currentPath}/${file.name}` },
       });
@@ -253,7 +254,7 @@ function FileListItem({ file, currentPath, refresh, token }) {
         <div
           onClick={() =>
             (window.location.href = `/file-manager?path=${encodeURIComponent(
-              `${currentPath}/${file.name}`
+              normalizePath(`${currentPath}/${file.name}`)
             )}`)
           }
           className="flex flex-col items-center"
@@ -265,7 +266,7 @@ function FileListItem({ file, currentPath, refresh, token }) {
         </div>
       ) : (
         <a
-          href={`http://localhost:3001/file-manager/download?path=${encodeURIComponent(
+          href={`${API_URL}/file-manager/download?path=${encodeURIComponent(
             `${currentPath}/${file.name}`
           )}`}
           download
@@ -309,7 +310,7 @@ function FileManager() {
   const fetchFiles = async () => {
     setIsLoading(true);
     try {
-      const res = await axios.get("http://localhost:3001/file-manager/list", {
+      const res = await axios.get(`${API_URL}/file-manager/list`, {
         params: { path: currentPath },
         headers: { Authorization: token },
       });
@@ -388,16 +389,12 @@ function FileManager() {
       formData.append("path", currentPath);
 
       try {
-        await axios.post(
-          "http://localhost:3001/file-manager/upload",
-          formData,
-          {
-            headers: {
-              Authorization: token,
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
+        await axios.post(`${API_URL}/file-manager/upload`, formData, {
+          headers: {
+            Authorization: token,
+            "Content-Type": "multipart/form-data",
+          },
+        });
       } catch (err) {
         alert(`Ошибка загрузки файла: ${file.name}`);
       }
@@ -409,10 +406,13 @@ function FileManager() {
 
   const handleCreateFolder = async () => {
     if (!newFolderName) return;
+    const fullPath = currentPath
+      ? `${currentPath}/${newFolderName}`
+      : newFolderName;
     try {
       await axios.post(
-        "http://localhost:3001/file-manager/mkdir",
-        { path: `${currentPath}/${newFolderName}` },
+        `${API_URL}/file-manager/mkdir`,
+        { path: fullPath },
         { headers: { Authorization: token } }
       );
       setNewFolderName("");
