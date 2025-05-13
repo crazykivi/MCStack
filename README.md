@@ -35,11 +35,18 @@
 git clone https://github.com/crazykivi/minecraft-backend.git
 cd minecraft-backend
 ```
+* Или скачайте один из архивов, доступных в релизных версия: [github.com/releases](https://github.com/crazykivi/MCStack/releases)
 
-* Запустите проект с помощью Docker Compose
+* Запустите скрипт start.bat (для Windows) или start.sh (для Ubuntu и Debian)
+> Для Linux (Ubuntu или Debian) нужно сделать файл исполняемым: 
+> ```bash
+> chmod +x start.sh
+> ```
+> После чего запустите скрипт ./start.sh
+* Или запустите проект вручную с помощью Docker Compose
 
 ```javascript
-docker-compose up -d
+docker compose up -d
 ```
 
 ## **Конфигурация**
@@ -58,7 +65,8 @@ docker-compose up -d
   "maxMemory": "2G",
   "minMemory": "1G",
   "defaultServerType": "vanilla",
-  "defaultServerVersion": "1.20.6"
+  "defaultServerVersion": "1.20.6",
+  "disableFrontendAuth": false
 }
 ```
 
@@ -71,6 +79,15 @@ docker-compose up -d
 * minMemory : Минимальный объем оперативной памяти, выделяемый серверу (например, 1G).
 * defaultServerType : Параметр стандартного типа сервера, если параметр не передан в запросе запуска (vanilla для стандартного сервера Minecraft).
 * defaultServerVersion : Параметр стандартной версии сервера, если параметр не передан в запросе запуска (1.20.6 для стандартного сервера Minecraft).
+* disableFrontendAuth: Параметр для отключения и включения авторизации для Frontend и Backend
+  * По умолчанию  — авторизация включена:
+  ```javascript 
+  false 
+  ```
+  * Проверки авторизации отключаются как на Backend, так и на Frontend:
+  ```javascript 
+  true
+  ```
 
 Стуктура файла .env:
 
@@ -158,7 +175,7 @@ COMPOSE_PROFILES=
 
 ## **Система логирования**
 
-В версии 1.4a была переработана система логирования. Теперь она более гибкая и удобная для настройки. Был добавлен отдельный модуль логирования и конфигурационный файл.
+В версии 0.2.21 была переработана система логирования. Теперь она более гибкая и удобная для настройки. Был добавлен отдельный модуль логирования и конфигурационный файл.
 
 Конфигурация логирования находится в файле logger.json:
 
@@ -166,7 +183,7 @@ COMPOSE_PROFILES=
 {
   "logging": {
     "enabled": true,
-    "debug": true,
+    "debug": false,
     "java": true,
     "commandOutup": true,
     "commandError": true,
@@ -174,7 +191,12 @@ COMPOSE_PROFILES=
     "minecraftServer": true,
     "vanilla": true,
     "forge": true,
-    "fabric": true
+    "fabric": true,
+    "paper": true,
+    "spigot": true,
+    "webSocket": false,
+    "configLog": false,
+    "redis": true
   }
 }
 ```
