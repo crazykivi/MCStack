@@ -162,6 +162,45 @@ router.post(
   }
 );
 
+// Переименование файла или папки
+router.post("/rename", authenticateRequest, async (req, res) => {
+  const { oldPath, newPath } = req.body;
+
+  if (!oldPath || !newPath) {
+    return res.status(400).json({ error: "Не указаны пути" });
+  }
+
+  const fullOldPath = path.resolve(SERVER_DIR, normalizePath(oldPath));
+  const fullNewPath = path.resolve(SERVER_DIR, normalizePath(newPath));
+
+  if (!fullOldPath.startsWith(SERVER_DIR) || !fullNewPath.startsWith(SERVER_DIR)) {
+    return res.status(403).json({ error: "Запрещено выходить за пределы директории" });
+  }
+
+  try {
+    if (!(await fs.pathExists(fullOldPath))) {
+      return res.status(404).json({ error: "Файл или папка не найдены" });
+    }
+
+    if (await fs.pathExists(fullNewPath)) {
+      return res.status(409).json({ error: "Файл или папка с таким именем уже существует" });
+    }
+
+    await fs.rename(fullOldPath, fullNewPath);
+
+    const oldFolderPath = path.dirname(fullOldPath);
+    const newFolderPath = path.dirname(fullNewPath);
+
+    await invalidateFolderSizeCache(path.relative(SERVER_DIR, oldFolderPath));
+    await invalidateFolderSizeCache(path.relative(SERVER_DIR, newFolderPath));
+
+    res.json({ message: "Успешно переименовано" });
+  } catch (err) {
+    console.error("Ошибка при переименовании:", err.message);
+    res.status(500).json({ error: "Ошибка при переименовании", details: err.message });
+  }
+});
+
 // Поиск файлов по имени (В будущем будет реализован поиск на фронт)
 // router.get("/search", authenticateRequest, async (req, res) => {
 //   const relativePath = normalizePath(req.query.path);
@@ -212,6 +251,43 @@ router.post(
 //     res.status(500).json({ error: "Ошибка поиска файлов" });
 //   }
 // });
+
+// Редактирование файла
+router.post("/edit", authenticateRequest, async (req, res) => {
+  const { path: requestedPath, content } = req.body;
+
+  if (!requestedPath) {
+    return res.status(400).json({ error: "Путь не указан" });
+  }
+
+  const relativePath = normalizePath(requestedPath);
+  const filePath = path.join(SERVER_DIR, relativePath);
+
+  if (!filePath.startsWith(SERVER_DIR)) {
+    return res.status(403).json({ error: "Запрещено" });
+  }
+
+  try {
+    if (!(await fs.pathExists(filePath))) {
+      return res.status(404).json({ error: "Файл не найден" });
+    }
+
+    const stat = await fs.lstat(filePath);
+    if (stat.isDirectory()) {
+      return res.status(400).json({ error: "Невозможно редактировать папку" });
+    }
+
+    await fs.writeFile(filePath, content, "utf8");
+
+    const folderPath = path.dirname(filePath);
+    await invalidateFolderSizeCache(path.relative(SERVER_DIR, folderPath));
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("Ошибка при редактировании файла:", err.message);
+    res.status(500).json({ error: "Ошибка при сохранении файла" });
+  }
+});
 
 // Отчистка размера кэша
 async function invalidateFolderSizeCache(folderPath) {

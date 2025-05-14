@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { API_URL } from "../utils/apiConfig";
+import EditFileModal from "./EditFileModal";
 
 function FileIcon({ type }) {
   let icon = null;
-
   switch (type) {
     case "folder":
       icon = (
@@ -16,14 +16,15 @@ function FileIcon({ type }) {
           strokeWidth="2"
           className="w-6 h-6"
         >
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>
       );
       break;
-
     case "txt":
+    case "properties":
     case "js":
     case "json":
+    case "conf":
       icon = (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -40,7 +41,6 @@ function FileIcon({ type }) {
         </svg>
       );
       break;
-
     case "zip":
       icon = (
         <svg
@@ -57,7 +57,6 @@ function FileIcon({ type }) {
         </svg>
       );
       break;
-
     case "jar":
       icon = (
         <svg
@@ -75,7 +74,6 @@ function FileIcon({ type }) {
         </svg>
       );
       break;
-
     case "yml":
     case "yaml":
       icon = (
@@ -94,7 +92,6 @@ function FileIcon({ type }) {
         </svg>
       );
       break;
-
     case "css":
       icon = (
         <svg
@@ -112,7 +109,6 @@ function FileIcon({ type }) {
         </svg>
       );
       break;
-
     case "png":
     case "jpg":
     case "jpeg":
@@ -133,7 +129,6 @@ function FileIcon({ type }) {
         </svg>
       );
       break;
-
     case "pdf":
       icon = (
         <svg
@@ -151,7 +146,6 @@ function FileIcon({ type }) {
         </svg>
       );
       break;
-
     default:
       icon = (
         <svg
@@ -170,34 +164,8 @@ function FileIcon({ type }) {
       );
       break;
   }
-
   return icon;
 }
-
-// function Breadcrumb({ path, navigateTo }) {
-//   const parts = path.split("/").filter(Boolean);
-//   return (
-//     <div className="flex items-center space-x-1 text-sm text-gray-600 mb-2">
-//       <span
-//         onClick={() => navigateTo("")}
-//         className="cursor-pointer hover:underline"
-//       >
-//         public_html
-//       </span>
-//       {parts.map((part, i) => (
-//         <React.Fragment key={i}>
-//           <span>/</span>
-//           <span
-//             onClick={() => navigateTo(parts.slice(0, i + 1).join("/"))}
-//             className="cursor-pointer hover:underline"
-//           >
-//             {part}
-//           </span>
-//         </React.Fragment>
-//       ))}
-//     </div>
-//   );
-// }
 
 function normalizePath(path) {
   if (!path) return "";
@@ -208,10 +176,7 @@ function Breadcrumb({ path, navigateTo }) {
   const parts = normalizePath(path).split("/").filter(Boolean);
   return (
     <div className="flex items-center space-x-1 text-sm text-gray-600 mb-2">
-      <span
-        onClick={() => navigateTo("")}
-        className="cursor-pointer hover:underline"
-      >
+      <span onClick={() => navigateTo("")} className="cursor-pointer hover:underline">
         server
       </span>
       {parts.map((part, i) => (
@@ -229,64 +194,122 @@ function Breadcrumb({ path, navigateTo }) {
   );
 }
 
-function FileListItem({ file, currentPath, refresh, token }) {
-  const [isDeleting, setIsDeleting] = useState(false);
+function RenameModal({ oldName, onClose, onRename, currentPath, token }) {
+  const [newName, setNewName] = useState(oldName);
+  const inputRef = useRef();
 
-  const handleDelete = async () => {
-    if (!window.confirm(`Удалить "${file.name}"?`)) return;
-    setIsDeleting(true);
+  useEffect(() => {
+    if (inputRef.current) inputRef.current.focus();
+  }, []);
+
+  const handleRename = async () => {
+    if (!newName || newName === oldName) return;
     try {
-      await axios.delete(`${API_URL}/file-manager/delete`, {
-        headers: { Authorization: token },
-        data: { path: `${currentPath}/${file.name}` },
+      await fetch(`${API_URL}/file-manager/rename`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: token,
+        },
+        body: JSON.stringify({
+          oldPath: `${currentPath}/${oldName}`,
+          newPath: `${currentPath}/${newName}`,
+        }),
       });
-      refresh();
+      onRename(newName);
     } catch (err) {
-      alert("Ошибка при удалении");
+      alert("Ошибка при переименовании");
     } finally {
-      setIsDeleting(false);
+      onClose();
     }
   };
 
   return (
-    <div className="group flex flex-col items-center p-2 hover:bg-gray-100 rounded cursor-pointer relative transition-all duration-200">
+    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+      <div className="bg-white p-4 rounded shadow-lg max-w-xs w-full">
+        <h3 className="text-lg font-semibold mb-2">Переименовать</h3>
+        <input
+          type="text"
+          value={newName}
+          ref={inputRef}
+          onChange={(e) => setNewName(e.target.value)}
+          className="border border-gray-300 rounded px-3 py-2 w-full mb-3"
+        />
+        <div className="flex justify-end space-x-2">
+          <button
+            onClick={onClose}
+            className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={handleRename}
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Переименовать
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FileListItem({ file, currentPath, refresh, token, onRightClick }) {
+  // const [isDeleting, setIsDeleting] = useState(false);
+
+  // const handleDelete = async () => {
+  //   if (!window.confirm(`Удалить "${file.name}"?`)) return;
+  //   setIsDeleting(true);
+  //   try {
+  //     await axios.delete(`${API_URL}/file-manager/delete`, {
+  //       headers: { Authorization: token },
+  //       data: { path: `${currentPath}/${file.name}` },
+  //     });
+  //     refresh();
+  //   } catch (err) {
+  //     alert("Ошибка при удалении");
+  //   } finally {
+  //     setIsDeleting(false);
+  //   }
+  // };
+
+  const handleOpenFolder = () => {
+    if (file.isDirectory) {
+      window.location.href = `/file-manager?path=${encodeURIComponent(
+        normalizePath(`${currentPath}/${file.name}`)
+      )}`;
+    }
+  };
+
+  return (
+    <div
+      onContextMenu={(e) => onRightClick(e, file)}
+      className="group flex flex-col items-center p-2 hover:bg-gray-100 rounded cursor-pointer relative transition-all duration-200"
+    >
       {file.isDirectory ? (
-        <div
-          onClick={() =>
-            (window.location.href = `/file-manager?path=${encodeURIComponent(
-              normalizePath(`${currentPath}/${file.name}`)
-            )}`)
-          }
-          className="flex flex-col items-center"
-        >
+        <div onClick={handleOpenFolder} className="flex flex-col items-center">
           <FileIcon type="folder" />
           <span className="text-xs mt-1 text-gray-700 truncate w-24 text-center">
             {file.name}
           </span>
         </div>
       ) : (
-        <a
-          href={`${API_URL}/file-manager/download?path=${encodeURIComponent(
-            `${currentPath}/${file.name}`
-          )}`}
-          download
-          className="flex flex-col items-center"
-        >
+        <div className="flex flex-col items-center">
           <FileIcon type={file.name.split(".").pop()} />
           <span className="text-xs mt-1 text-gray-700 truncate w-24 text-center">
             {file.name}
           </span>
-        </a>
+        </div>
       )}
 
-      <button
+      {/* <button
         onClick={handleDelete}
         disabled={isDeleting}
         className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-sm transition-opacity duration-200"
         aria-label="Удалить"
       >
         &times;
-      </button>
+      </button> */}
     </div>
   );
 }
@@ -301,8 +324,13 @@ function FileManager() {
   const [isSearching, setIsSearching] = useState(false);
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [showUploadInput, setShowUploadInput] = useState(false);
-  const token = localStorage.getItem("token");
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingFile, setEditingFile] = useState(null);
 
+  const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, file: null });
+  const [showRenameModal, setShowRenameModal] = useState(false);
+
+  const token = localStorage.getItem("token");
   const search = new URLSearchParams(window.location.search);
   const initialPath = search.get("path") || "";
   const [currentPath, setCurrentPath] = useState(initialPath);
@@ -314,13 +342,11 @@ function FileManager() {
         params: { path: currentPath },
         headers: { Authorization: token },
       });
-
       if (Array.isArray(res.data.files)) {
         setFiles(res.data.files);
       } else {
         setFiles([]);
       }
-
       setFolderSize(res.data.folderSize || 0);
     } catch (err) {
       console.error("Ошибка загрузки файлов:", err.message);
@@ -335,43 +361,9 @@ function FileManager() {
     fetchFiles();
   }, [currentPath]);
 
-  // const fetchFiles = async (searchTerm = "") => {
-  //   setIsLoading(true);
-  //   setIsSearching(!!searchTerm);
-
-  //   try {
-  //     const endpoint = searchTerm
-  //       ? "/file-manager/search"
-  //       : "/file-manager/list";
-  //     const params = searchTerm
-  //       ? { query: searchTerm, path: currentPath }
-  //       : { path: currentPath };
-
-  //     const res = await axios.get(endpoint, {
-  //       params,
-  //       headers: { Authorization: token },
-  //     });
-
-  //     setFiles(res.data.files || []);
-  //   } catch (err) {
-  //     console.error("Ошибка загрузки файлов:", err.message);
-  //     setFiles([]);
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
-
-  // useEffect(() => {
-  //   if (!searchQuery) {
-  //     fetchFiles();
-  //   } else {
-  //     fetchFiles(searchQuery);
-  //   }
-  // }, [currentPath]);
-
   const navigateTo = (newPath) => {
     const normalizedNewPath = normalizePath(newPath);
-    const fullPath = `${normalizedNewPath}`;
+    const fullPath = normalizedNewPath;
     setCurrentPath(fullPath);
     window.history.replaceState(
       null,
@@ -382,12 +374,10 @@ function FileManager() {
 
   const handleUpload = async () => {
     if (!uploadFiles.length) return;
-
     for (const file of uploadFiles) {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("path", currentPath);
-
       try {
         await axios.post(`${API_URL}/file-manager/upload`, formData, {
           headers: {
@@ -399,7 +389,6 @@ function FileManager() {
         alert(`Ошибка загрузки файла: ${file.name}`);
       }
     }
-
     setUploadFiles([]);
     fetchFiles();
   };
@@ -430,6 +419,95 @@ function FileManager() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (contextMenu.show) {
+        setContextMenu({ ...contextMenu, show: false });
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [contextMenu.show]);
+
+  const handleRightClick = (e, file) => {
+    e.preventDefault();
+    setContextMenu({
+      show: true,
+      x: e.clientX,
+      y: e.clientY,
+      file,
+    });
+  };
+
+  const openRenameModal = () => {
+    setShowRenameModal(true);
+    setContextMenu({ ...contextMenu, show: false });
+  };
+
+  const handleDelete = async () => {
+    const file = contextMenu.file;
+    if (!window.confirm(`Удалить "${file.name}"?`)) return;
+    try {
+      await axios.delete(`${API_URL}/file-manager/delete`, {
+        headers: { Authorization: token },
+        data: { path: `${currentPath}/${file.name}` },
+      });
+      fetchFiles();
+    } catch (err) {
+      alert("Ошибка при удалении");
+    }
+  };
+
+  const handleDownload = () => {
+    const file = contextMenu.file;
+    const fullPath = `${currentPath}/${file.name}`;
+    const downloadUrl = `${API_URL}/file-manager/download?path=${encodeURIComponent(fullPath)}`;
+  
+    fetch(downloadUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': token,
+      },
+    })
+      .then(async (res) => {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || 'Ошибка доступа к файлу');
+        }
+  
+        return res.blob();
+      })
+      .then((blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      })
+      .catch((err) => {
+        console.error(err);
+        alert('Ошибка при скачивании файла. Возможно, вы не авторизованы.');
+      });
+  
+    setContextMenu({ ...contextMenu, show: false });
+  };
+
+  const handleOpenFolder = () => {
+    const file = contextMenu.file;
+    if (file.isDirectory) {
+      navigateTo(`${currentPath}/${file.name}`);
+    }
+  };
+
+  const openEditModal = (file) => {
+    setEditingFile(file);
+    setShowEditModal(true);
+  };
+
   return (
     <div className="flex h-screen">
       {isLoading && (
@@ -437,28 +515,9 @@ function FileManager() {
           <div className="loader"></div>
         </div>
       )}
+
       <div className="w-64 bg-gray-200 p-4">
         <ul>
-          {/* <li className="py-2">
-            <a href="#" className="text-blue-600">
-              Настроить аккаунт
-            </a>
-          </li>
-          <li className="py-2">
-            <a href="#" className="text-blue-600">
-              Панель доступа
-            </a>
-          </li>
-          <li className="py-2">
-            <a href="#" className="text-blue-600">
-              API достп
-            </a>
-          </li>
-          <li className="py-2">
-            <a href="#" className="text-blue-600">
-              Мои миры
-            </a>
-          </li> */}
           <li className="py-2">
             <a href="/dashboard" className="text-blue-600">
               Консоль
@@ -469,143 +528,132 @@ function FileManager() {
               Файловый менеджер
             </a>
           </li>
-          {/* <li className="py-2">
-            <a href="#" className="text-blue-600">
-              Управление задачами
-            </a>
-          </li>
-          <li className="py-2">
-            <a href="#" className="text-blue-600">
-              Конфигурация
-            </a>
-          </li> */}
         </ul>
       </div>
+
       <div className="flex-1 p-4">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-lg font-bold">Файловый менеджер</h1>
         </div>
-        {/* Навигация и список файлов */}
+
         <div className="flex mt-4">
           <div className="w-64 border-r p-2">
-            <div className="mb-4">
-              {/* Панель иконок */}
-              <div className="relative mb-4">
-                <div className="flex space-x-4 text-gray-600">
-                  {/* Иконка создания папки */}
-                  <button onClick={() => setShowFolderInput(!showFolderInput)}>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="w-6 h-6 hover:text-blue-500 transition"
-                    >
-                      <path d="M4 12h16v6H4z"></path>
-                      <path d="M12 4l-2 4H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-6l-2-4z"></path>
-                    </svg>
-                  </button>
-                  {/* Иконка загрузки файла */}
-                  <button onClick={() => setShowUploadInput(!showUploadInput)}>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="w-6 h-6 hover:text-blue-500 transition"
-                    >
-                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
-                      <polyline points="7 10 12 5 17 10"></polyline>
-                      <line x1="12" y1="5" x2="12" y2="19"></line>
-                    </svg>
+            <div className="relative mb-4">
+              <div className="flex space-x-4 text-gray-600">
+                <button onClick={() => setShowFolderInput(!showFolderInput)}>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="w-6 h-6 hover:text-blue-500 transition"
+                  >
+                    <path d="M4 12h16v6H4z"></path>
+                    <path d="M12 4l-2 4H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-6l-2-4z"></path>
+                  </svg>
+                </button>
+                <button onClick={() => setShowUploadInput(!showUploadInput)}>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="w-6 h-6 hover:text-blue-500 transition"
+                  >
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"></path>
+                    <polyline points="7 10 12 5 17 10"></polyline>
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                  </svg>
+                </button>
+              </div>
+
+              {/* Поле создания папки */}
+              {showFolderInput && (
+                <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-md z-50 p-3">
+                  <input
+                    type="text"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    placeholder="Имя папки"
+                    className="border rounded px-2 py-1 w-full mb-2"
+                  />
+                  <button
+                    onClick={handleCreateFolder}
+                    className="bg-green-500 text-white px-3 py-1 rounded text-sm"
+                  >
+                    Создать
                   </button>
                 </div>
-                {/* Поле для создания папки */}
-                {showFolderInput && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-md z-50 p-3">
-                    <input
-                      type="text"
-                      value={newFolderName}
-                      onChange={(e) => setNewFolderName(e.target.value)}
-                      placeholder="Имя папки"
-                      className="border rounded px-2 py-1 w-full mb-2"
-                    />
-                    <button
-                      onClick={handleCreateFolder}
-                      className="bg-green-500 text-white px-3 py-1 rounded text-sm"
-                    >
-                      Создать
-                    </button>
+              )}
+
+{showEditModal && editingFile && (
+  <EditFileModal
+    file={editingFile}
+    currentPath={currentPath}
+    token={token}
+    onClose={() => setShowEditModal(false)}
+    onSave={() => {
+      fetchFiles(); // Обновляем список файлов
+    }}
+  />
+)}
+
+              {/* Поле загрузки файла */}
+              {showUploadInput && (
+                <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-md z-50 p-3 w-64">
+                  <div
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const files = Array.from(e.dataTransfer.files);
+                      setUploadFiles(files);
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    className="border-2 border-dashed border-gray-400 rounded p-4 text-center mb-2 cursor-pointer hover:bg-gray-50 transition"
+                  >
+                    <p className="text-sm text-gray-600">
+                      Перетащите сюда файлы или папки
+                    </p>
                   </div>
-                )}
-                {/* Поле загрузки файла */}
-                {showUploadInput && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border rounded shadow-md z-50 p-3 w-64">
-                    {/* Зона перетаскивания */}
-                    <div
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const files = Array.from(e.dataTransfer.files);
-                        setUploadFiles(files);
-                      }}
-                      onDragOver={(e) => e.preventDefault()}
-                      className="border-2 border-dashed border-gray-400 rounded p-4 text-center mb-2 cursor-pointer hover:bg-gray-50 transition"
-                    >
-                      <p className="text-sm text-gray-600">
-                        Перетащите сюда файлы или папки
-                      </p>
-                    </div>
-
-                    {/* Инпут для выбора файлов */}
-                    <input
-                      type="file"
-                      multiple
-                      webkitdirectory
-                      onChange={(e) => {
-                        const files = Array.from(e.target.files);
-                        setUploadFiles(files);
-                      }}
-                      className="mb-2 w-full"
-                    />
-
-                    {/* Список загруженных файлов */}
-                    {uploadFiles.length > 0 && (
-                      <ul className="text-xs text-gray-600 max-h-32 overflow-y-auto mb-2">
-                        {uploadFiles.map((file, i) => (
-                          <li key={i} title={file.name}>
-                            • {file.name}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    {/* Кнопка загрузить */}
-                    <button
-                      onClick={handleUpload}
-                      disabled={!uploadFiles.length}
-                      className={`w-full px-3 py-1 rounded text-sm ${
-                        uploadFiles.length
-                          ? "bg-blue-500 text-white hover:bg-blue-600"
-                          : "bg-gray-300 cursor-not-allowed"
-                      }`}
-                    >
-                      Загрузить
-                    </button>
-
-                    {/* Отмена */}
-                    <button
-                      onClick={() => setShowUploadInput(false)}
-                      className="w-full mt-1 bg-gray-500 text-white px-3 py-1 rounded text-sm"
-                    >
-                      Отмена
-                    </button>
-                  </div>
-                )}
-              </div>
+                  <input
+                    type="file"
+                    multiple
+                    webkitdirectory
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files);
+                      setUploadFiles(files);
+                    }}
+                    className="mb-2 w-full"
+                  />
+                  {uploadFiles.length > 0 && (
+                    <ul className="text-xs text-gray-600 max-h-32 overflow-y-auto mb-2">
+                      {uploadFiles.map((file, i) => (
+                        <li key={i}>• {file.name}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <button
+                    onClick={handleUpload}
+                    disabled={!uploadFiles.length}
+                    className={`w-full px-3 py-1 rounded text-sm ${
+                      uploadFiles.length
+                        ? "bg-blue-500 text-white hover:bg-blue-600"
+                        : "bg-gray-300 cursor-not-allowed"
+                    }`}
+                  >
+                    Загрузить
+                  </button>
+                  <button
+                    onClick={() => setShowUploadInput(false)}
+                    className="w-full mt-1 bg-gray-500 text-white px-3 py-1 rounded text-sm"
+                  >
+                    Отмена
+                  </button>
+                </div>
+              )}
             </div>
-            {/* <Breadcrumb path={currentPath} navigateTo={navigateTo} /> */}
+
             <ul>
               <li
                 onClick={() => navigateTo("")}
@@ -626,8 +674,8 @@ function FileManager() {
                 ))}
             </ul>
           </div>
+
           <div className="flex-1 p-2">
-            <div className="mb-4 flex items-center gap-2"></div>
             <div className="grid grid-cols-6 gap-2">
               {files.map((file, index) => (
                 <FileListItem
@@ -636,22 +684,81 @@ function FileManager() {
                   currentPath={currentPath}
                   refresh={fetchFiles}
                   token={token}
+                  onRightClick={handleRightClick}
                 />
               ))}
             </div>
           </div>
         </div>
+
         <div className="bg-gray-100 p-2 text-sm text-gray-600 flex justify-between items-center mt-4">
           <Breadcrumb path={currentPath} navigateTo={navigateTo} />
-
           <span>
             Файлов: {files.length}, Размер:{" "}
-            {formatBytes(
-              folderSize || files.reduce((acc, f) => acc + f.size, 0)
-            )}
+            {formatBytes(folderSize || files.reduce((acc, f) => acc + f.size, 0))}
           </span>
         </div>
       </div>
+
+      {/* Контекстное меню */}
+      {contextMenu.show && contextMenu.file && (
+        <div
+          className="fixed z-50 bg-white border rounded shadow-md"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <ul>
+            {contextMenu.file.isDirectory && (
+              <li
+                onClick={handleOpenFolder}
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+              >
+                Открыть
+              </li>
+            )}
+            {!contextMenu.file.isDirectory && (
+              <li onClick={() => { openEditModal(contextMenu.file); }} 
+              className="px-4 py-2 hover:bg-gray-100 cursor-pointer" 
+              >
+                Редактировать
+              </li>
+            )}
+            <li
+              onClick={openRenameModal}
+              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+            >
+              Переименовать
+            </li>
+            {!contextMenu.file.isDirectory && (
+              <li
+                onClick={handleDownload}
+                className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+              >
+                Скачать
+              </li>
+            )}
+            <li
+              onClick={handleDelete}
+              className="px-4 py-2 hover:bg-red-100 text-red-600 cursor-pointer"
+            >
+              Удалить
+            </li>
+          </ul>
+        </div>
+      )}
+
+      {/* Модалка для переименования */}
+      {showRenameModal && contextMenu.file && (
+        <RenameModal
+          oldName={contextMenu.file.name}
+          currentPath={currentPath}
+          token={token}
+          onClose={() => setShowRenameModal(false)}
+          onRename={() => {
+            fetchFiles();
+            setShowRenameModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
