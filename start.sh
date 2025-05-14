@@ -16,7 +16,7 @@ show_menu() {
     echo ""
     echo "  [1] Запустить все сервисы (all)"
     echo "  [2] Запустить local-redis (без frontend)"
-    echo "  [3] Запустить frontend (без redis/api)"
+    echo "  [3] Запустить frontend (без redis)"
     echo "  [4] Запустить только API"
     echo "  [5] Остановить контейнеры"
     echo "  [6] Перезапустить контейнеры"
