@@ -8,7 +8,9 @@ function EditFileModal({ file, currentPath, token, onClose, onSave }) {
 
   useEffect(() => {
     const fetchContent = async () => {
-      const downloadUrl = `${API_URL}/file-manager/download?path=${encodeURIComponent(`${currentPath}/${file.name}`)}`;
+      const downloadUrl = `${API_URL}/file-manager/download?path=${encodeURIComponent(
+        `${currentPath}/${file.name}`
+      )}`;
       const response = await fetch(downloadUrl, {
         headers: {
           Authorization: token,
@@ -60,7 +62,11 @@ function EditFileModal({ file, currentPath, token, onClose, onSave }) {
       <div className="bg-white w-3/4 h-3/4 rounded shadow-lg flex flex-col">
         <div className="p-4 border-b flex justify-between">
           <h3>Редактирование: {file.name}</h3>
-          <button onClick={onClose} disabled={isSaving} className="text-red-500">
+          <button
+            onClick={onClose}
+            disabled={isSaving}
+            className="text-red-500"
+          >
             Закрыть
           </button>
         </div>

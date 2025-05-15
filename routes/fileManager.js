@@ -2,9 +2,13 @@ const express = require("express");
 const fs = require("fs-extra");
 const path = require("path");
 const router = express.Router();
-const { authenticateRequest } = require("../middleware/serverAuth");
+const {
+  authenticateRequest
+} = require("../middleware/serverAuth");
 const redisClient = require("../utils/redis");
-const { redis } = require("../utils/logger");
+const {
+  redis
+} = require("../utils/logger");
 const multer = require("multer");
 
 const SERVER_DIR = "/app/server";
@@ -58,12 +62,16 @@ router.get("/list", authenticateRequest, async (req, res) => {
   if (!fullPath.startsWith(SERVER_DIR)) {
     return res
       .status(403)
-      .json({ error: "Запрещено выходить за пределы директории" });
+      .json({
+        error: "Запрещено выходить за пределы директории"
+      });
   }
 
   try {
     if (!(await fs.pathExists(fullPath))) {
-      return res.status(404).json({ error: "Директория не найдена" });
+      return res.status(404).json({
+        error: "Директория не найдена"
+      });
     }
 
     const files = await fs.readdir(fullPath);
@@ -93,7 +101,10 @@ router.get("/list", authenticateRequest, async (req, res) => {
     console.error("Ошибка чтения директории:", err.message);
     res
       .status(500)
-      .json({ error: "Ошибка чтения директории", details: err.message });
+      .json({
+        error: "Ошибка чтения директории",
+        details: err.message
+      });
   }
 });
 
@@ -137,53 +148,121 @@ router.get("/download", authenticateRequest, (req, res) => {
   res.download(filePath);
 });
 
-const upload = multer();
+// const upload = multer();
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage
+});
 
 // Загрузить файл
+// router.post(
+//   "/upload",
+//   authenticateRequest,
+//   upload.single("file"),
+//   async (req, res) => {
+//     const dir = path.resolve(SERVER_DIR, req.body.path);
+//     if (!dir.startsWith(SERVER_DIR)) return res.status(403).send("Запрещено");
+
+//     const file = req.file;
+//     if (!file) return res.status(400).send("Файл не найден");
+
+//     const filePath = path.join(dir, file.originalname);
+
+//     try {
+//       await fs.writeFile(filePath, file.buffer);
+//       res.send("Файл загружен");
+//     } catch (err) {
+//       res.status(500).send("Ошибка сохранения файла");
+//     }
+//   }
+// );
 router.post(
   "/upload",
   authenticateRequest,
-  upload.single("file"),
+  upload.array("file"),
   async (req, res) => {
-    const dir = path.resolve(SERVER_DIR, req.body.path);
-    if (!dir.startsWith(SERVER_DIR)) return res.status(403).send("Запрещено");
+    const requestedDir = req.body.path;
+    const fullPath = path.resolve(SERVER_DIR, requestedDir);
 
-    const file = req.file;
-    if (!file) return res.status(400).send("Файл не найден");
+    if (!fullPath.startsWith(SERVER_DIR)) {
+      return res.status(403).send("Запрещено");
+    }
 
-    const filePath = path.join(dir, file.originalname);
+    let relativePaths = [];
+    try {
+      relativePaths = JSON.parse(req.body.relativePaths);
+    } catch (e) {
+      return res.status(400).send("Неверный формат relativePaths");
+    }
+
+    if (!Array.isArray(relativePaths)) {
+      return res.status(400).send("relativePaths должен быть массивом");
+    }
 
     try {
-      await fs.writeFile(filePath, file.buffer);
-      res.send("Файл загружен");
+      for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        const relativePath = relativePaths[i];
+        const fileName = path.basename(relativePath);
+        const dirStructure = path.dirname(relativePath);
+        const targetDir = path.join(fullPath, dirStructure);
+
+        if (await fs.pathExists(targetDir)) {
+          const stats = await fs.lstat(targetDir);
+          if (stats.isFile()) {
+            await fs.unlink(targetDir);
+          }
+        }
+
+        await fs.mkdir(targetDir, {
+          recursive: true
+        });
+
+        const filePath = path.join(targetDir, fileName);
+        await fs.writeFile(filePath, file.buffer);
+      }
+
+      res.send("Файлы успешно загружены");
     } catch (err) {
-      res.status(500).send("Ошибка сохранения файла");
+      console.error("Ошибка сохранения файлов:", err.message);
+      res.status(500).send("Ошибка сохранения файлов");
     }
   }
 );
 
 // Переименование файла или папки
 router.post("/rename", authenticateRequest, async (req, res) => {
-  const { oldPath, newPath } = req.body;
+  const {
+    oldPath,
+    newPath
+  } = req.body;
 
   if (!oldPath || !newPath) {
-    return res.status(400).json({ error: "Не указаны пути" });
+    return res.status(400).json({
+      error: "Не указаны пути"
+    });
   }
 
   const fullOldPath = path.resolve(SERVER_DIR, normalizePath(oldPath));
   const fullNewPath = path.resolve(SERVER_DIR, normalizePath(newPath));
 
   if (!fullOldPath.startsWith(SERVER_DIR) || !fullNewPath.startsWith(SERVER_DIR)) {
-    return res.status(403).json({ error: "Запрещено выходить за пределы директории" });
+    return res.status(403).json({
+      error: "Запрещено выходить за пределы директории"
+    });
   }
 
   try {
     if (!(await fs.pathExists(fullOldPath))) {
-      return res.status(404).json({ error: "Файл или папка не найдены" });
+      return res.status(404).json({
+        error: "Файл или папка не найдены"
+      });
     }
 
     if (await fs.pathExists(fullNewPath)) {
-      return res.status(409).json({ error: "Файл или папка с таким именем уже существует" });
+      return res.status(409).json({
+        error: "Файл или папка с таким именем уже существует"
+      });
     }
 
     await fs.rename(fullOldPath, fullNewPath);
@@ -194,10 +273,15 @@ router.post("/rename", authenticateRequest, async (req, res) => {
     await invalidateFolderSizeCache(path.relative(SERVER_DIR, oldFolderPath));
     await invalidateFolderSizeCache(path.relative(SERVER_DIR, newFolderPath));
 
-    res.json({ message: "Успешно переименовано" });
+    res.json({
+      message: "Успешно переименовано"
+    });
   } catch (err) {
     console.error("Ошибка при переименовании:", err.message);
-    res.status(500).json({ error: "Ошибка при переименовании", details: err.message });
+    res.status(500).json({
+      error: "Ошибка при переименовании",
+      details: err.message
+    });
   }
 });
 
@@ -254,27 +338,38 @@ router.post("/rename", authenticateRequest, async (req, res) => {
 
 // Редактирование файла
 router.post("/edit", authenticateRequest, async (req, res) => {
-  const { path: requestedPath, content } = req.body;
+  const {
+    path: requestedPath,
+    content
+  } = req.body;
 
   if (!requestedPath) {
-    return res.status(400).json({ error: "Путь не указан" });
+    return res.status(400).json({
+      error: "Путь не указан"
+    });
   }
 
   const relativePath = normalizePath(requestedPath);
   const filePath = path.join(SERVER_DIR, relativePath);
 
   if (!filePath.startsWith(SERVER_DIR)) {
-    return res.status(403).json({ error: "Запрещено" });
+    return res.status(403).json({
+      error: "Запрещено"
+    });
   }
 
   try {
     if (!(await fs.pathExists(filePath))) {
-      return res.status(404).json({ error: "Файл не найден" });
+      return res.status(404).json({
+        error: "Файл не найден"
+      });
     }
 
     const stat = await fs.lstat(filePath);
     if (stat.isDirectory()) {
-      return res.status(400).json({ error: "Невозможно редактировать папку" });
+      return res.status(400).json({
+        error: "Невозможно редактировать папку"
+      });
     }
 
     await fs.writeFile(filePath, content, "utf8");
@@ -285,7 +380,9 @@ router.post("/edit", authenticateRequest, async (req, res) => {
     res.sendStatus(200);
   } catch (err) {
     console.error("Ошибка при редактировании файла:", err.message);
-    res.status(500).json({ error: "Ошибка при сохранении файла" });
+    res.status(500).json({
+      error: "Ошибка при сохранении файла"
+    });
   }
 });
 
