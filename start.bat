@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 mode 60,20 >nul
 chcp 65001 >nul
 
