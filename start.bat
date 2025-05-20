@@ -2,33 +2,33 @@
 mode 60,20 >nul
 chcp 65001 >nul
 
-:: Проверка, установлен ли Docker
+:: Proverka, ustanovlen li Docker
 where docker >nul 2>&1
 if %errorlevel% neq 0 (
     goto docker_not_found
 )
 
-:: Основное меню
+:: Osnovnoe menu
 :start
 cls
 echo.
 echo         ========== MCStack Manager ==========
 echo.
-echo  [1] Запустить все сервисы (all)
-echo  [2] Запустить local-redis (без frontend)
-echo  [3] Запустить frontend (без redis)
-echo  [4] Запустить только API
-echo  [5] Остановить контейнеры
-echo  [6] Перезапустить контейнеры
-echo  [7] Посмотреть логи
-echo  [0] Выход
+echo  [1] Start all services (all)
+echo  [2] Start local-redis (without frontend)
+echo  [3] Start frontend (without redis)
+echo  [4] Start only API
+echo  [5] Stop containers
+echo  [6] Restart containers
+echo  [7] View logs
+echo  [0] Exit
 echo.
-set /p "choice=Выберите действие (1-7) или 0 для выхода: "
+set /p "choice=Select action (1-7) or 0 to exit: "
 
 if "%choice%"=="1" (
     set COMPOSE_PROFILES=all
     docker compose up -d
-    echo Запущено с профилем: all
+    echo Started with profile: all
     pause
     goto start
 )
@@ -36,7 +36,7 @@ if "%choice%"=="1" (
 if "%choice%"=="2" (
     set COMPOSE_PROFILES=local-redis
     docker compose up -d
-    echo Запущено с профилем: local-redis
+    echo Started with profile: local-redis
     pause
     goto start
 )
@@ -44,7 +44,7 @@ if "%choice%"=="2" (
 if "%choice%"=="3" (
     set COMPOSE_PROFILES=frontend
     docker compose up -d
-    echo Запущено с профилем: frontend
+    echo Started with profile: frontend
     pause
     goto start
 )
@@ -52,21 +52,21 @@ if "%choice%"=="3" (
 if "%choice%"=="4" (
     set COMPOSE_PROFILES=
     docker compose up -d
-    echo Запущен только API
+    echo Only API started
     pause
     goto start
 )
 
 if "%choice%"=="5" (
     docker compose down
-    echo Контейнеры остановлены
+    echo Containers stopped
     pause
     goto start
 )
 
 if "%choice%"=="6" (
     docker compose restart
-    echo Контейнеры перезапущены
+    echo Containers restarted
     pause
     goto start
 )
@@ -78,68 +78,68 @@ if "%choice%"=="7" (
 )
 
 if "%choice%"=="0" (
-    echo Выход...
+    echo Exiting...
     exit /b
 )
 
-echo Неверный выбор...
+echo Invalid choice...
 pause
 goto start
 
-:: Если Docker не найден
+:: Esli Docker ne naiden
 :docker_not_found
 cls
 echo.
 echo         ========== MCStack Manager ==========
 echo.
-echo    Ошибка: Docker не установлен или недоступен!
-echo    Важно: Если у вас уже установлен Docker, но пишет, 
-echo    что Docker не доступен:
-echo    Перезапустите Docker и скрипт start.bat после
-echo    запуска Docker.
+echo    Error: Docker is not installed or unavailable!
+echo    Important: If you already have Docker installed but it says 
+echo    that Docker is unavailable:
+echo    Restart Docker and the start.bat script after
+echo    Docker starts.
 echo.
-echo    [1] Установить Docker Desktop
-echo    [0] Выйти
+echo    [1] Install Docker Desktop
+echo    [0] Exit
 echo.
-set /p "choice=Выберите действие (1 или 0): "
+set /p "choice=Select action (1 or 0): "
 
 if "%choice%"=="1" (
-    echo Установка Docker Desktop...
-    echo Скачивание установщика...
+    echo Installing Docker Desktop...
+    echo Downloading installer...
 
-    :: Скачивание Docker с проверкой и User-Agent
+    :: Skachivanie Docker s proverkoi i User-Agent
     powershell -Command "Invoke-WebRequest -Uri 'https://desktop.docker.com/win/main/amd64/Docker%%20Desktop%%20Installer.exe ' -OutFile '%TEMP%\DockerInstaller.exe' -Headers @{'User-Agent'='Windows'}"
 
-    echo Проверка загрузки...
+    echo Checking download...
     if not exist "%TEMP%\DockerInstaller.exe" (
-        echo Ошибка: Не удалось скачать установщик!
+        echo Error: Failed to download installer!
         pause
         goto docker_not_found
     )
 
-    echo Запуск установщика...
+    echo Running installer...
     start /wait "" "%TEMP%\DockerInstaller.exe"
-    echo Установка завершена.
+    echo Installation complete.
 
-    echo Удаление установщика...
+    echo Deleting installer...
     del /f /q "%TEMP%\DockerInstaller.exe" >nul
 
-    echo Запуск Docker Desktop...
+    echo Starting Docker Desktop...
     start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
 
-    echo Ожидание запуска Docker...
+    echo Waiting for Docker to start...
     timeout /t 15 >nul
-    echo Перезапуск терминала после установки Docker.
+    echo Restarting terminal after Docker installation.
     start "" "%COMSPEC%" /k "%cd%\%~nx0"
     
     exit /b
 )
 
 if "%choice%"=="0" (
-    echo Выход...
+    echo Exiting...
     exit /b
 )
 
-echo Неверный выбор...
+echo Invalid choice...
 pause
 goto docker_not_found
