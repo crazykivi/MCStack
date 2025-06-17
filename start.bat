@@ -50,7 +50,7 @@ if "%choice%"=="3" (
 )
 
 if "%choice%"=="4" (
-    set COMPOSE_PROFILES=
+    set COMPOSE_PROFILES=api-only
     docker compose up -d
     echo Only API started
     pause

@@ -33,6 +33,11 @@ services:
     dns:
       - 8.8.8.8
       - 8.8.4.4
+    profiles:
+      - "local-redis"
+      - "frontend"
+      - "api-only"
+      - "all"
 
   frontend:
     image: crazykivi/mcstack-frontend:0.2.531
