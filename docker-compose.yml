@@ -1,0 +1,55 @@
+version: "3"
+name: mcstack
+
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - minecraft-network
+    profiles:
+      - "local-redis"
+      - "all"
+
+  api:
+    image: crazykivi/mcstack-api:0.2.531
+    ports:
+      - "3001:3001"
+      - "25565:25565"
+      - "3002:3002"
+    volumes:
+      - mcstack_data:/app/data
+      - ./server:/app/server
+      - ./config:/app/config
+    env_file:
+      - .env
+    environment:
+      DISABLE_REDIS: ${DISABLE_REDIS:-0}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+    restart: always
+    networks:
+      - minecraft-network
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  frontend:
+    image: crazykivi/mcstack-frontend:0.2.531
+    ports:
+      - "3000:3000"
+      - "80:80"
+    depends_on:
+      - api
+    restart: always
+    profiles:
+      - "frontend"
+      - "all"
+    networks:
+      - minecraft-network
+
+networks:
+  minecraft-network:
+
+volumes:
+  mcstack_data:

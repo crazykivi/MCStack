@@ -1,0 +1,14 @@
+{
+    "serverDirectory": "./server",
+    "javaPath": "./java/jdk/bin/java",
+    "javaDownloads": {
+        "linux": {
+            "base": "https://api.adoptium.net/v3/binary/latest/{version}/ga/linux/x64/jdk/hotspot/normal/adoptium?project=jdk"
+        }
+    },
+    "maxMemory": "2G",
+    "minMemory": "1G",
+    "defaultServerType": "vanilla",
+    "defaultServerVersion": "1.21.5",
+    "disableFrontendAuth": false
+}
