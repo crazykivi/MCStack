@@ -37,25 +37,142 @@ Currently, the following server types are supported in the automated build syste
 
 ## **Installation**
 
-* Clone the repository:
 
-```javascript
-git clone https://github.com/crazykivi/minecraft-backend.git
-cd minecraft-backend
-```
+1. Download the Project
 
-* Or download one of the archives from the release page: [github.com/releases](https://github.com/crazykivi/MCStack/releases)
-* Run the start.bat script (for Windows) or start.sh (for Ubuntu and Debian) 
-> For Linux (Ubuntu or Debian), make the script executable first:
-> ```bash
-> chmod +x start.sh
-> ```
-> Then run the script:
-* Or manually start the project using Docker Compose:
+   
+   1. Option 1: Clone the Repository
 
-```javascript
-docker compose up -d
-```  
+      ```bash
+      git clone https://github.com/crazykivi/minecraft-backend.git
+      cd minecraft-backend
+      ```
+   2. Option 2: You can download one of the release versions from GitHub: [Releases](https://github.com/crazykivi/MCStack/releases)
+   3. Option 3: Create a file named `docker-compose.yml` in your project folder and add the following content
+
+      ```yaml
+      version: "3"
+      name: mcstack
+      
+      services:
+        redis:
+          image: redis:latest
+          ports:
+            - "6379:6379"
+          networks:
+            - minecraft-network
+          profiles:
+            - "local-redis"
+            - "all"
+      
+        api:
+          image: crazykivi/mcstack-api:0.2.531
+          ports:
+            - "3001:3001"
+            - "25565:25565"
+            - "3002:3002"
+          volumes:
+            - mcstack_data:/app/data
+            - ./server:/app/server
+            - ./config:/app/config
+          env_file:
+            - .env
+          environment:
+            DISABLE_REDIS: ${DISABLE_REDIS:-0}
+            REDIS_HOST: ${REDIS_HOST:-redis}
+          restart: always
+          networks:
+            - minecraft-network
+          dns:
+            - 8.8.8.8
+            - 8.8.4.4
+          profiles:
+            - "local-redis"
+            - "frontend"
+            - "api-only"
+            - "all"
+      
+        frontend:
+          image: crazykivi/mcstack-frontend:0.2.531
+          ports:
+            - "3000:3000"
+            - "80:80"
+          depends_on:
+            - api
+          restart: always
+          profiles:
+            - "frontend"
+            - "all"
+          networks:
+            - minecraft-network
+      
+      networks:
+        minecraft-network:
+      
+      volumes:
+        mcstack_data:
+      ```
+   4. Option 4: Download Pre-Made `docker-compose.yml`
+
+      [docker-compose.yml 1084](/api/attachments.redirect?id=d6d42e19-e784-4845-8caf-1cbf2f45ec67)
+
+2. Configure the `.env` File *(optional)*
+
+   
+   1. Create `.env` in the Project Root
+
+      ```env
+      # Path to SQLite database file (used for authentication)
+      DATABASE_PATH=/app/data/users.db
+      
+      # Secret key for JWT encryption
+      
+      JWT_SECRET=your_jwt_secret_key_here
+      
+      # Redis settings (if using external Redis)
+      # REDIS_HOST=redis
+      # REDIS_PORT=6379
+      
+      # Launch Profiles
+      # Run everything (API, Redis, Frontend)
+      COMPOSE_PROFILES=all
+      
+      # Run without frontend but with Redis (mainly used in development)
+      # COMPOSE_PROFILES=local-redis
+      
+      # Run without Redis but with Frontend
+      # COMPOSE_PROFILES=frontend
+      
+      # To run only the API, set this variable to "api-only"
+      # COMPOSE_PROFILES=api-only
+      
+      # URL to backend for frontend (if not set, defaults to http://localhost:3001)
+      # REACT_APP_API_URL=http://yourdomain.com:3001
+      ```
+   2. Or Download Ready `.env` 
+
+      [.env 1580](/api/attachments.redirect?id=7dabc6a9-9578-4e80-ae67-3ade512193dc)
+
+3. Launch the Project
+
+   
+   1. Option A: Using Script (`start.bat` or `start.sh`)
+
+      > For Windows: simply run `start.bat`
+      >
+      > For Linux (Ubuntu or Debian): make the script executable:
+      >
+      > 
+      > 1. ```bash
+      >    chmod +x start.sh
+      >    ./start.sh
+      >    ```
+   2. Option B: Manual Start via Docker Compose
+
+      ```bash
+      docker compose up -d
+      ```
+
 </details>
 <details>
 <summary>🇷🇺 Показать описание на русском</summary>
@@ -88,22 +205,125 @@ docker compose up -d
 
 ## **Установка**
 
-* Склонируйте репозиторий:
+Скачайте проект
 
-```javascript
-git clone https://github.com/crazykivi/minecraft-backend.git
-cd minecraft-backend
-```
-* Или скачайте один из архивов, доступных в релизных версия: [github.com/releases](https://github.com/crazykivi/MCStack/releases)
-* Запустите скрипт start.bat (для Windows) или start.sh (для Ubuntu и Debian)
-> Для Linux (Ubuntu или Debian) нужно сделать файл исполняемым: 
-> ```bash
-> chmod +x start.sh
-> ```
-> После чего запустите скрипт ./start.sh
-* Или запустите проект вручную с помощью Docker Compose
+    Склонируйте репозиторий:
 
-```javascript
-docker compose up -d
-```
+    git clone https://github.com/crazykivi/minecraft-backend
+    git cd minecraft-backend
+
+    Или скачайте один из архивов, доступных в релизных версия: github.com/releases
+
+    Или создайте в нужной папке файл docker-compose.yml и добавьте в него:
+
+    version: "3"
+    name: mcstack
+
+    services:
+      redis:
+        image: redis:latest
+        ports:
+          - "6379:6379"
+        networks:
+          - minecraft-network
+        profiles:
+          - "local-redis"
+          - "all"
+
+      api:
+        image: crazykivi/mcstack-api:latest
+        ports:
+          - "3001:3001"
+          - "25565:25565"
+          - "3002:3002"
+        volumes:
+          - mcstack_data:/app/data
+          - ./server:/app/server
+          - ./config:/app/config
+        env_file:
+          - .env
+        environment:
+          DISABLE_REDIS: ${DISABLE_REDIS:-0}
+          REDIS_HOST: ${REDIS_HOST:-redis}
+        restart: always
+        networks:
+          - minecraft-network
+        dns:
+          - 8.8.8.8
+          - 8.8.4.4
+        profiles:
+          - "local-redis"
+          - "frontend"
+          - "api-only"
+          - "all"
+
+      frontend:
+        image: crazykivi/mcstack-frontend:latest
+        ports:
+          - "3000:3000"
+          - "80:80"
+        depends_on:
+          - api
+        restart: always
+        profiles:
+          - "frontend"
+          - "all"
+        networks:
+          - minecraft-network
+
+    networks:
+      minecraft-network:
+
+    volumes:
+      mcstack_data:
+
+    Или просто скачайте готовый docker-compose.yml
+
+Настройка .env файла (если требуется):
+
+    Создайте .env файл в корне проекта и добавьте в него:
+
+    # ENG/RUS
+    DATABASE_PATH=/app/data/users.db
+    JWT_SECRET=obyazatelno_input_your_jwt_secret_key
+
+    # If you already have Redis, specify the host and port / Если у вас уже есть Redis, укажите хост и порт
+    # REDIS_HOST=redis
+    # REDIS_PORT=6379
+
+    # Launch profiles / Профили запуска
+    # Run everything / Запуск всего
+    COMPOSE_PROFILES=all
+
+    # Run without frontend and with Redis (currently used only in development, / Запуск без frontend с redis (пока используется только в разработке, 
+    # in the future it will be possible to manage API requests) / в будущем будет возможность управлять api запросами)
+    # COMPOSE_PROFILES=local-redis
+
+    # Run without Redis but with frontend / Запуск без редис, но с frontend
+    # COMPOSE_PROFILES=frontend
+    # To run only the api, write api-only to the COMPOSE_PROFILES variable / Для запуска только api в переменную COMPOSE_PROFILES нужно записать api-only
+    # COMPOSE_PROFILES=api-only
+
+    # This variable is a link to the backend (for the frontend). If the REACT_APP_API_URL variable is missing, the default value 'http://localhost:3001' is used 
+    # Эта переменная являетя ссылкой на бекенд (для фронтенда). Если переменная REACT_APP_API_URL отсутствует, берётся дефолтное значение 'http://localhost:3001'
+    # REACT_APP_API_URL=http://192.168.20.184:3001
+
+    Или просто скачайте готовый .env
+
+    Запустите проект
+
+        Запустите скрипт (start.bat или start.sh)
+
+            Для Windows: просто запустите start.bat
+
+            Для Linux (Ubuntu или Debian) нужно сделать файл исполняемым:
+
+            chmod +x start.sh
+
+            После чего запустите скрипт ./start.sh
+
+        Или запустите проект вручную с помощью Docker Compose
+
+        docker compose up -d
+
 </details>
