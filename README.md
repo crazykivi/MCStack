@@ -6,6 +6,9 @@
 
 This project is still in development. The translation is being handled by mysterious forces (AI), so expect some glitches and weirdness along the way. The original language of this project is Russian.
 
+## 🔄 Note
+This project is still being translated. Currently, only the Wiki documentation is being translated — the backend and frontend parts of the project have not been translated yet.
+
 <details>
 <summary>🇬🇧 Show description in English</summary>
 
@@ -53,8 +56,8 @@ Currently, the automatic setup supports the following server types:
    1. Clone the repository:
 
       ```javascript
-      git clone https://github.com/crazykivi/minecraft-backend  
-      cd minecraft-backend
+      git clone https://github.com/crazykivi/mcstack
+      cd mcstack
       ```
 
    2. Or download one of the release archives: [GitHub Releases](https://github.com/crazykivi/MCStack/releases)
@@ -231,9 +234,8 @@ Currently, the automatic setup supports the following server types:
    1. Склонируйте репозиторий:
 
       ```javascript
-      git clone https://github.com/crazykivi/minecraft-backend
-  
-      git cd minecraft-backend
+      git clone https://github.com/crazykivi/mcstack
+      cd mcstack
       ```
    2. Или скачайте один из архивов, доступных в релизных версия: [github.com/releases](https://github.com/crazykivi/MCStack/releases)
   
