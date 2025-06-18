@@ -13,7 +13,7 @@ services:
       - "all"
 
   api:
-    image: crazykivi/mcstack-api:0.2.531
+    image: crazykivi/mcstack-api:0.2.6
     ports:
       - "3001:3001"
       - "25565:25565"
