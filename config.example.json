@@ -1,0 +1,12 @@
+{
+    "auth": {
+      "enabled": false,
+      "token": "your-secret-token-here"
+    },
+    "server": {
+      "port": 8080
+    },
+    "paths": {
+      "data_dir": "./data"
+    }
+  }
